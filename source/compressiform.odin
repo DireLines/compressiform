@@ -1,9 +1,20 @@
 package game
 
-//boilerplate / starter code for your game-specific logic in this engine
+import "core:strconv"
+import "core:strings"
+import "core:unicode/utf8"
+import maps "mapgen"
 import rl "vendor:raylib"
 
+//boilerplate / starter code for your game-specific logic in this engine
 GAME_NAME :: "my game"
+BACKGROUND_MAP_COLOR :: rl.Color{128, 128, 128, 255}
+CAMERA_MAP_COLOR :: rl.Color{99, 155, 255, 255}
+
+
+level_messages :: []string {
+	"in a world where they never figured out paper and just kept writing stuff on stone tablets, somebody needs to",
+}
 
 //object tags
 //these are mostly game-specific boolean tags on objects
@@ -33,15 +44,39 @@ Round :: struct {
 	target_message:           string,
 	message:                  Message,
 }
+Letter :: distinct struct {
+	str:  string,
+	size: f64,
+}
+//used for find/replace
+Equals :: distinct struct{}
+//used for counting occurrences of stuff
+Times :: distinct struct{}
+MessageObjectType :: enum {
+	Egg,
+	SmashedEgg,
+	Chick,
+	Apple,
+	RottenApple,
+	Orange,
+	RottenOrange,
+	Pebble,
+}
+//some other random object that is stuck on the tablet
+Object :: distinct struct {
+	type: MessageObjectType,
+}
+MessageElement :: union {
+	Letter,
+	Equals,
+	Times,
+	Object,
+}
 Message :: [dynamic]MessageElement
 
-MessageElement :: union {
-	string,
-	GameObjectHandle,
-}
-
 GameSpecificProps :: struct {
-	text: string,
+	text:                string,
+	get_message_element: proc() -> MessageElement,
 }
 
 ChunkLoadingMode :: enum {
@@ -52,7 +87,7 @@ GameSpecificGlobalState :: struct {
 	clicked_ui_object:  Maybe(GameObjectHandle),
 	dragged_object:     Maybe(GameObjectHandle),
 	current_round:      Round,
-	menu_state:         MenuState,
+	stage:              GameStage,
 	menu_container:     GameObjectHandle,
 	global_tilemap:     Tilemap `cbor:"-"`, //not serialized - too big
 	chunk_loading_mode: ChunkLoadingMode,
@@ -72,14 +107,8 @@ GameSpecificGlobalState :: struct {
 //but those things will never apply to a collectible item
 //so Enemy and Collectible can be two variants in the union
 DefaultVariant :: distinct struct{}
-Tablet :: struct {}
-Letter :: struct {
-	message: string,
-}
 GameObjectVariant :: union {
 	DefaultVariant,
-	Tablet,
-	Letter,
 }
 
 //type constraints to check at runtime (outside of Odin's type system)
@@ -132,10 +161,11 @@ RenderLayer :: enum uint {
 //types of tiles
 TileType :: enum {
 	None,
+	Floor,
 	Wall_Left,
 	Wall_Right,
+	Wall_Solid,
 	Ceiling,
-	Floor,
 }
 //properties of each type of tile
 TILE_PROPERTIES := [TileType]TileTypeInfo {
@@ -154,6 +184,11 @@ TILE_PROPERTIES := [TileType]TileTypeInfo {
 		texture = atlas_textures[.Rock],
 		render_layer = uint(RenderLayer.Ceiling),
 	},
+	.Wall_Solid = {
+		collision = {layer = .Wall, resolve = true, trigger_events = true},
+		texture = atlas_textures[.Rock],
+		render_layer = uint(RenderLayer.Ceiling),
+	},
 	.Wall_Right = {
 		collision = {layer = .Wall, resolve = true, trigger_events = true},
 		texture = atlas_textures[.Rock],
@@ -166,35 +201,108 @@ TILE_PROPERTIES := [TileType]TileTypeInfo {
 	},
 }
 
-//I assume you want your game to have a main menu
 //this keeps track of whether you are in the menu or in the game
-MenuState :: enum {
-	InGame,
-	MainMenu,
+GameStage :: enum {
+	Compressing,
+	Scoring,
+	GameOver,
 }
 
 //game-specific initialization logic (run once when game is started)
 //typically this will be "set up the main menu"
-game_start :: proc(game: ^Game) {}
+game_start :: proc(game: ^Game) {
+	game.color_to_tiletype[rl.BLACK] = .Wall_Solid
+	game.color_to_tiletype[BACKGROUND_MAP_COLOR] = .None
+	game.color_to_spawn[CAMERA_MAP_COLOR] = .Player
+	load_map :: proc() -> (tilemap: Tilemap, player_spawn: TilemapTileId) {
+		MAP_DATA :: #load("map.png")
+		tiles_img := rl.LoadImageFromMemory(".png", raw_data(MAP_DATA), i32(len(MAP_DATA)))
+		tiles_buf := maps.img_to_buf(tiles_img, transpose = true)
+		color_to_tile :: proc(c: rl.Color) -> Tile {
+			t := Tile{}
+			tiletype, ok := game.color_to_tiletype[c]
+			if ok {
+				t.type = tiletype
+			}
+			spawntype, spawn_ok := game.color_to_spawn[c]
+			if spawn_ok {
+				t.spawn = spawntype
+			}
+			return t
+		}
+		return img_to_tilemap(tiles_buf, color_to_tile)
+	}
+}
 
 //game-specific teardown / reset logic
 reset_game :: proc(game: ^Game) {}
 
 //game-specific update logic (run once per frame)
-game_update :: proc(game: ^Game, dt: f64) {}
+game_update :: proc(game: ^Game, dt: f64) {
+	//update timer
+	//if time is up, end the round
+	//handle click & drag
+	//on drag stop, update the round message
+}
 
 game_specific_load :: proc(game: ^Game = game, save: ^GameSave) {
 
 }
 
 //decode message
-// message_to_string :: proc(message: Message) -> string {}
-//make message from string
-// string_to_message :: proc(s: string) -> Message {}
+message_to_string :: proc(message: Message) -> string {
+	replacements := map[MessageElement]MessageElement{}
+	result := ""
+	//parse message into result
+	i := 0
+	for i < len(message) {
+		element := message[i]
+		//assume we are at the start of a token
+		//a token is either
+		//  a single element
+		//  [key: MessageElement] equals [value]
+		//  [number] times [value]
+		switch elem in element {
+		case Letter:
+			//first, attempt to parse
+			idx := i
+			num_str := elem.str
+			//parse until non-number
+			_, ok := strconv.parse_int(elem.str)
+			for ok {
+				idx += 1
+				next_element := message[i]
+				#partial switch next_el in next_element {
+				case Letter:
+					_, ok = strconv.parse_int(next_el.str)
+					if !ok {
+						break
+					}
+					num_str := strings.concatenate({num_str, next_el.str})
+				case:
+					break
+				}
+			}
+		case Equals:
+		case Times:
+		case Object:
+		}
+	}
+	return result
+}
 
+split_message :: proc(message: Message) -> []Message {}
+//make message from string
+string_to_message :: proc(s: string) -> Message {
+	result := Message{}
+	for c in s {
+		append(&result, Letter{str = utf8.runes_to_string({c})})
+	}
+	return result
+}
 
 //called once at start of game
-// spawn_background :: proc() {}
+spawn_background :: proc() {}
 //called at start of round
 // spawn_tablets :: proc(message: Message) -> []GameObjectHandle {
 //divide message into tablet-sized chunks
