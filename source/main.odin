@@ -200,7 +200,7 @@ game_init :: proc() {
 	game = new(Game)
 	game_init_mem(game)
 	game_init_raylib(game)
-	game_start()
+	game_start(game)
 	when LOAD_PATH != "" {
 		load_game(game, LOAD_PATH)
 	}
@@ -317,7 +317,7 @@ game_step :: proc(game: ^Game = game) {
 	}
 	//assumption: this function is not generally supposed to touch transform position directly or it'll mess up physics
 	//it is responsible for setting velocity, and setting position only if a sudden teleport is needed
-	game_update(dt) //game specific update
+	game_update(game, dt) //game specific update
 	timer->time("update")
 	if should_simulate {
 		//after main update so that changes to animation states are immediately rendered

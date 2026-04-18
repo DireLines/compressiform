@@ -16,7 +16,9 @@ ObjectTag :: enum {
 	Text, // if present, the renderer will draw the text data of this object
 	DoNotSerialize,
 	DontDestroyOnLoad,
+	CustomDraw,
 	//user-defined tags
+	Draggable,
 }
 
 SpawnType :: enum {
@@ -26,7 +28,21 @@ SpawnType :: enum {
 	Checkpoint,
 }
 
-GameSpecificProps :: struct {}
+Round :: struct {
+	time_limit, time_elapsed: f64,
+	target_message:           string,
+	message:                  Message,
+}
+Message :: [dynamic]MessageElement
+
+MessageElement :: union {
+	string,
+	GameObjectHandle,
+}
+
+GameSpecificProps :: struct {
+	text: string,
+}
 
 ChunkLoadingMode :: enum {
 	Room,
@@ -34,6 +50,8 @@ ChunkLoadingMode :: enum {
 }
 GameSpecificGlobalState :: struct {
 	clicked_ui_object:  Maybe(GameObjectHandle),
+	dragged_object:     Maybe(GameObjectHandle),
+	current_round:      Round,
 	menu_state:         MenuState,
 	menu_container:     GameObjectHandle,
 	global_tilemap:     Tilemap `cbor:"-"`, //not serialized - too big
@@ -54,8 +72,14 @@ GameSpecificGlobalState :: struct {
 //but those things will never apply to a collectible item
 //so Enemy and Collectible can be two variants in the union
 DefaultVariant :: distinct struct{}
+Tablet :: struct {}
+Letter :: struct {
+	message: string,
+}
 GameObjectVariant :: union {
 	DefaultVariant,
+	Tablet,
+	Letter,
 }
 
 //type constraints to check at runtime (outside of Odin's type system)
@@ -108,7 +132,10 @@ RenderLayer :: enum uint {
 //types of tiles
 TileType :: enum {
 	None,
-	Wall,
+	Wall_Left,
+	Wall_Right,
+	Ceiling,
+	Floor,
 }
 //properties of each type of tile
 TILE_PROPERTIES := [TileType]TileTypeInfo {
@@ -117,14 +144,25 @@ TILE_PROPERTIES := [TileType]TileTypeInfo {
 		render_layer = uint(RenderLayer.Floor),
 		random_rotation = true,
 	},
-	.Wall = {
+	.Floor = {
 		collision = {layer = .Wall, resolve = true, trigger_events = true},
 		texture = atlas_textures[.Rock],
 		render_layer = uint(RenderLayer.Ceiling),
-		wall_render_info = RenderInfo {
-			texture = atlas_textures[.Darkrock],
-			render_layer = uint(RenderLayer.Floor),
-		},
+	},
+	.Wall_Left = {
+		collision = {layer = .Wall, resolve = true, trigger_events = true},
+		texture = atlas_textures[.Rock],
+		render_layer = uint(RenderLayer.Ceiling),
+	},
+	.Wall_Right = {
+		collision = {layer = .Wall, resolve = true, trigger_events = true},
+		texture = atlas_textures[.Rock],
+		render_layer = uint(RenderLayer.Ceiling),
+	},
+	.Ceiling = {
+		collision = {layer = .Wall, resolve = true, trigger_events = true},
+		texture = atlas_textures[.Rock],
+		render_layer = uint(RenderLayer.Ceiling),
 	},
 }
 
@@ -148,3 +186,25 @@ game_update :: proc(game: ^Game, dt: f64) {}
 game_specific_load :: proc(game: ^Game = game, save: ^GameSave) {
 
 }
+
+//decode message
+message_to_string :: proc(message: Message) -> string {}
+//make message from string
+string_to_message :: proc(s: string) -> Message {}
+
+
+//called once at start of game
+spawn_background :: proc() {}
+//called at start of round
+spawn_tablets :: proc(message: Message) -> []GameObjectHandle {
+	//divide message into tablet-sized chunks
+	//for each chunk, spawn tablet displaying that message
+}
+//called from spawn_tablets
+spawn_tablet :: proc(pos: vec2, message: Message) -> GameObjectHandle {}
+//called from spawn_tablet
+spawn_letter :: proc(pos: vec2, message: MessageElement) -> GameObjectHandle {}
+// reset_round :: proc() {}
+// start_round :: proc(round:Round) {}
+// score_round :: proc(round:Round) {}
+// end_current_round :: proc() {}

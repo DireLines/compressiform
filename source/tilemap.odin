@@ -79,7 +79,7 @@ get_chunks_in_room :: proc(start_tile: TilemapTileId) -> map[ChunkId]struct{} {
 	queue := make([dynamic]TilemapTileId, allocator = context.temp_allocator)
 	chunks := make(map[ChunkId]struct{})
 
-	if get_tile(start_tile).type == .Wall {
+	if TILE_PROPERTIES[get_tile(start_tile).type].resolve {
 		return chunks
 	}
 
@@ -103,7 +103,7 @@ get_chunks_in_room :: proc(start_tile: TilemapTileId) -> map[ChunkId]struct{} {
 				continue
 			}
 			visited[neighbor] = {}
-			if get_tile(neighbor).type != .Wall {
+			if !TILE_PROPERTIES[get_tile(neighbor).type].resolve {
 				append(&queue, neighbor)
 			}
 		}
