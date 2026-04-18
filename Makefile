@@ -85,6 +85,7 @@ web: #build for web using emscripten
 	odin build source/main_web -o:speed -target:js_wasm32 -build-mode:obj \
 		-define:glsl_version="300 es" \
 		-define:RAYLIB_WASM_LIB=env.o -define:RAYGUI_WASM_LIB=env.o \
+		-define:show_fps=false \
 		-strict-style -out:$(WEB_DIR)/game.wasm.o; \
 	cp $(ODIN_ROOT)/core/sys/wasm/js/odin.js $(WEB_DIR); \
 	emcc -g -o $(WEB_DIR)/index.html \

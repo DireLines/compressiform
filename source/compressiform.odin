@@ -1,6 +1,7 @@
 package game
 
 import "core:fmt"
+import "core:slice"
 import "core:strconv"
 import "core:strings"
 import "core:unicode/utf8"
@@ -15,9 +16,19 @@ IN_GAME_FONT_SIZE :: 36
 GAME_NAME :: "compressiform"
 BACKGROUND_MAP_COLOR :: rl.Color{128, 128, 128, 255}
 CAMERA_MAP_COLOR :: rl.Color{99, 155, 255, 255}
-LEVEL_MESSAGES :: []string {
-	"In a world where they never figured out paper, important messages are still sent overseas on stone tablets. You are in charge of compressing the longer messages to fit on a single stone tablet, saving your shipping company millions each year. First, let's do the basic due diligence of compacting the empty space in the message.",
-	"Now let's try another trick",
+@(rodata)
+LEVELS := []Level {
+	{
+		target_message = "Made for Ludum Dare 2026 by Nathaniel Saxe and Ryan Kann",
+		tablet_size = .Normal,
+		time_limit = 120,
+	},
+	{
+		target_message = "In a world where they never figured out paper, important messages are still sent overseas on stone tablets. You are in charge of compressing the longer messages to fit on a single stone tablet, saving your shipping company millions each year. First, let's do the basic due diligence of compacting the empty space in the message.",
+		tablet_size = .Normal,
+		time_limit = 180,
+	},
+	{target_message = "Now let's try another trick", tablet_size = .Normal, time_limit = 180},
 }
 
 //object tags
@@ -39,22 +50,25 @@ ObjectTag :: enum {
 SpawnType :: enum {
 	None,
 	Camera,
-	Background,
+	Backglevel,
 }
 
 TabletSize :: enum {
-	Small,
-	Smallish,
-	Normal,
-	Biggish,
-	Big,
+	Small    = 10,
+	Smallish = 15,
+	Normal   = 20,
+	Biggish  = 25,
+	Big      = 30,
 }
-Round :: struct {
-	time_limit, time_elapsed: f64,
-	target_message:           string,
-	message:                  Message,
-	target_loss:              f64,
-	tablet_size:              TabletSize,
+Level :: struct {
+	time_limit:     f64,
+	target_message: string,
+	minimum_loss:   f64,
+	tablet_size:    TabletSize,
+}
+LevelProgress :: struct {
+	level:   Level,
+	message: Message,
 }
 Letter :: distinct struct {
 	str:  string,
@@ -96,21 +110,21 @@ ChunkLoadingMode :: enum {
 	Proximity,
 }
 GameSpecificGlobalState :: struct {
-	clicked_ui_object:  Maybe(GameObjectHandle),
-	dragged_object:     Maybe(GameObjectHandle),
-	current_round:      Round,
-	round_number:       int,
-	stage:              GameStage,
-	menu_container:     GameObjectHandle,
-	global_tilemap:     Tilemap `cbor:"-"`, //not serialized - too big
-	chunk_loading_mode: ChunkLoadingMode,
+	clicked_ui_object:    Maybe(GameObjectHandle),
+	dragged_object:       Maybe(GameObjectHandle),
+	level_number:         int,
+	using level_progress: LevelProgress,
+	stage:                GameStage,
+	menu_container:       GameObjectHandle,
+	global_tilemap:       Tilemap `cbor:"-"`, //not serialized - too big
+	chunk_loading_mode:   ChunkLoadingMode,
 	//we load the map immediately, but need to remember
 	//where to spawn the player when the player object is spawned later
-	camera_spawn_point: vec2,
-	camera_bounds:      Rect,
-	player_handle:      GameObjectHandle,
-	color_to_tiletype:  map[rl.Color]TileType,
-	color_to_spawn:     map[rl.Color]SpawnType,
+	camera_spawn_point:   vec2,
+	camera_bounds:        Rect,
+	player_handle:        GameObjectHandle,
+	color_to_tiletype:    map[rl.Color]TileType,
+	color_to_spawn:       map[rl.Color]SpawnType,
 }
 
 //object variants
@@ -204,6 +218,7 @@ TILE_PROPERTIES := [TileType]TileTypeInfo {
 
 //this keeps track of whether you are in the menu or in the game
 GameStage :: enum {
+	Start,
 	Compressing,
 	Scoring,
 	GameOver,
@@ -246,7 +261,7 @@ game_start :: proc(game: ^Game) {
 	// 		texture = atlas_textures[.Darkrock],
 	// 	},
 	// )
-	game.stage = .Compressing
+	game.stage = .Start
 }
 
 //game-specific teardown / reset logic
@@ -263,12 +278,15 @@ reset_game :: proc(g: ^Game = game) {
 //game-specific update logic (run once per frame)
 game_update :: proc(game: ^Game, dt: f64) {
 	switch game.stage {
+	case .Start:
+		game.level = LEVELS[game.level_number]
+		level_start(game.level)
 	case .Compressing:
 		game.main_camera.position += 1000 * dt * vec2{get_axis(.A, .D), get_axis(.W, .S)}
 	//update timer
-	//if time is up, end the round
+	//if time is up, end the level
 	//handle click & drag
-	//on drag stop, update the round message
+	//on drag stop, update the level message
 	case .Scoring:
 	//progress through scoring animation
 	case .GameOver:
@@ -327,7 +345,13 @@ split_message_into_tablets :: proc(
 	message: Message,
 	line_length, lines_per_tablet: int,
 ) -> []Message {
-	return {}
+	messages := make([dynamic]Message, context.temp_allocator)
+	chunk_size := line_length * lines_per_tablet
+	i := 0
+	for i < len(message) {
+
+	}
+	return messages[:]
 }
 //make message from string
 string_to_message :: proc(s: string) -> Message {
@@ -339,19 +363,40 @@ string_to_message :: proc(s: string) -> Message {
 }
 
 //called once at start of game
-//called at start of round
-// spawn_tablets :: proc(message: Message) -> []GameObjectHandle {
-//divide message into tablet-sized chunks
-//for each chunk, spawn tablet displaying that message
-// }
+//called at start of level
+spawn_tablets :: proc(level: Level, message: Message) -> []GameObjectHandle {
+	BASE_LINE_LENGTH :: 20
+	BASE_LINES_PER_TABLET :: 15
+	tablet_size_factor := f64(level.tablet_size) / f64(BASE_LINE_LENGTH)
+	//divide message into tablet-sized chunks
+	line_length := int(BASE_LINE_LENGTH * tablet_size_factor)
+	lines_per_tablet := int(BASE_LINES_PER_TABLET * tablet_size_factor)
+	tablet_messages := split_message_into_tablets(message, line_length, lines_per_tablet)
+	//for each chunk, spawn tablet displaying that message
+	tablet_objects := [dynamic]GameObjectHandle{}
+	for tablet_message, i in tablet_messages {
+		//TODO tablet size / derive tablet pos
+		append(&tablet_objects, spawn_tablet({0, 0}, tablet_message))
+	}
+	return tablet_objects[:]
+}
 //called from spawn_tablets
-// spawn_tablet :: proc(pos: vec2, message: Message) -> GameObjectHandle {}
+spawn_tablet :: proc(pos: vec2, message: Message) -> GameObjectHandle {
+	//TODO
+	return {}
+}
 //called from spawn_tablet
-// spawn_letter :: proc(pos: vec2, message: MessageElement) -> GameObjectHandle {}
-// reset_round :: proc() {}
-// start_round :: proc(round:Round) {}
-// score_round :: proc(round:Round) {}
-// end_current_round :: proc() {}
+spawn_message_element_object :: proc(
+	pos: vec2,
+	element: MessageElement,
+) -> GameObjectHandle {return {}}
+level_start :: proc(level: Level) {
+	message := string_to_message(level.target_message)
+	tablet_objects := spawn_tablets(level, message)
+}
+level_end :: proc(level: Level) {}
+level_score :: proc(level: Level) {}
+// end_current_level :: proc() {}
 get_axis :: proc(key_neg, key_pos: rl.KeyboardKey) -> f64 {
 	return f64(int(rl.IsKeyDown(key_pos))) - f64(int(rl.IsKeyDown(key_neg)))
 }
