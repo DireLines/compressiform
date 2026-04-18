@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:strconv"
 import "core:strings"
 import "core:unicode/utf8"
+import hm "handle_map_static"
 import maps "mapgen"
 import rl "vendor:raylib"
 
@@ -11,7 +12,7 @@ import rl "vendor:raylib"
 UI_MAIN_FONT_SIZE :: 72
 UI_SECONDARY_FONT_SIZE :: 42
 IN_GAME_FONT_SIZE :: 36
-GAME_NAME :: "my game"
+GAME_NAME :: "compressiform"
 BACKGROUND_MAP_COLOR :: rl.Color{128, 128, 128, 255}
 CAMERA_MAP_COLOR :: rl.Color{99, 155, 255, 255}
 LEVEL_MESSAGES :: []string {
@@ -106,6 +107,7 @@ GameSpecificGlobalState :: struct {
 	//we load the map immediately, but need to remember
 	//where to spawn the player when the player object is spawned later
 	camera_spawn_point: vec2,
+	camera_bounds:      Rect,
 	player_handle:      GameObjectHandle,
 	color_to_tiletype:  map[rl.Color]TileType,
 	color_to_spawn:     map[rl.Color]SpawnType,
@@ -231,15 +233,32 @@ game_start :: proc(game: ^Game) {
 		}
 		return img_to_tilemap(tiles_buf, get_tile)
 	}
-	player_spawn_tile: TilemapTileId
-	game.global_tilemap, player_spawn_tile = load_map()
-	game.camera_spawn_point = get_tile_center(player_spawn_tile)
+	cam_spawn_tile: TilemapTileId
+	game.global_tilemap, cam_spawn_tile = load_map()
+	game.camera_spawn_point = get_tile_center(cam_spawn_tile)
 	game.main_camera.position = game.camera_spawn_point
+	//TODO spawn background
+	// spawn_object(
+	// 	{
+	// 		name = "background",
+	// 		parent_handle = game.screen_space_parent_handle,
+	// 		scale = {200, 200},
+	// 		texture = atlas_textures[.Darkrock],
+	// 	},
+	// )
 	game.stage = .Compressing
 }
 
 //game-specific teardown / reset logic
-reset_game :: proc(game: ^Game) {}
+reset_game :: proc(g: ^Game = game) {
+	hm.clear(&g.objects)
+	clear(&g.chunks)
+	clear(&g.loaded_chunks)
+	recreate_final_transforms(g)
+	g.frame_counter = 0
+	g.screen_space_parent_handle = spawn_object(GameObject{name = "screen space parent"})
+	g.player_handle = {}
+}
 
 //game-specific update logic (run once per frame)
 game_update :: proc(game: ^Game, dt: f64) {
@@ -251,14 +270,15 @@ game_update :: proc(game: ^Game, dt: f64) {
 	//handle click & drag
 	//on drag stop, update the round message
 	case .Scoring:
-	//play scoring animation
+	//progress through scoring animation
 	case .GameOver:
 	//show new game button
 	}
 }
 
 game_specific_load :: proc(game: ^Game = game, save: ^GameSave) {
-
+	//intentionally left blank
+	//save / load not supported for target build which is web build
 }
 
 //decode message
@@ -319,7 +339,6 @@ string_to_message :: proc(s: string) -> Message {
 }
 
 //called once at start of game
-spawn_background :: proc() {}
 //called at start of round
 // spawn_tablets :: proc(message: Message) -> []GameObjectHandle {
 //divide message into tablet-sized chunks

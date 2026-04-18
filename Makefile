@@ -106,8 +106,8 @@ deploy: #deploy build/web to GitHub Pages (gh-pages branch)
 		git checkout -q -B gh-pages && \
 		git add . && \
 		git commit -q -m "deploy" && \
-		git push -f git@github.com:DireLines/odin-raylib-topdown-shooter.git gh-pages
-	@echo "Deployed! Visit: https://direlines.github.io/odin-raylib-topdown-shooter/"
+		git push -f git@github.com:DireLines/compressiform.git gh-pages
+	@echo "Deployed! Visit: https://direlines.github.io/compressiform/"
 
 web-deploy: web deploy #build for web then deploy to GitHub Pages
 

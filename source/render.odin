@@ -452,8 +452,8 @@ render :: proc() {
 	//draw using raylib
 	rl.BeginDrawing(); defer rl.EndDrawing()
 
-	// darkgray := rl.Color{32, 32, 30, 255}
-	rl.ClearBackground(rl.BLACK)
+	darkbrown := rl.Color{40, 32, 30, 255}
+	rl.ClearBackground(darkbrown)
 	curr_shader_name: ShaderName //tracking this to know when to switch shader modes, which is expensive
 	change_shader :: proc(s: ShaderName, curr: ^ShaderName) {
 		if curr^ == s {return}
