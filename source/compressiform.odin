@@ -10,10 +10,9 @@ import rl "vendor:raylib"
 GAME_NAME :: "my game"
 BACKGROUND_MAP_COLOR :: rl.Color{128, 128, 128, 255}
 CAMERA_MAP_COLOR :: rl.Color{99, 155, 255, 255}
-
-
-level_messages :: []string {
-	"in a world where they never figured out paper and just kept writing stuff on stone tablets, somebody needs to",
+LEVEL_MESSAGES :: []string {
+	"In a world where they never figured out paper, important messages are still sent overseas on stone tablets. You are in charge of compressing the longer messages to fit on a single stone tablet, saving your shipping company millions each year. First, let's do the basic due diligence of compacting the empty space in the message.",
+	"Now let's try another trick",
 }
 
 //object tags
@@ -39,10 +38,20 @@ SpawnType :: enum {
 	Checkpoint,
 }
 
+
+TabletSize :: enum {
+	Small,
+	Smallish,
+	Normal,
+	Biggish,
+	Big,
+}
 Round :: struct {
 	time_limit, time_elapsed: f64,
 	target_message:           string,
 	message:                  Message,
+	target_loss:              f64,
+	tablet_size:              TabletSize,
 }
 Letter :: distinct struct {
 	str:  string,
@@ -87,6 +96,7 @@ GameSpecificGlobalState :: struct {
 	clicked_ui_object:  Maybe(GameObjectHandle),
 	dragged_object:     Maybe(GameObjectHandle),
 	current_round:      Round,
+	round_number:       int,
 	stage:              GameStage,
 	menu_container:     GameObjectHandle,
 	global_tilemap:     Tilemap `cbor:"-"`, //not serialized - too big
@@ -232,6 +242,7 @@ game_start :: proc(game: ^Game) {
 		}
 		return img_to_tilemap(tiles_buf, color_to_tile)
 	}
+	game.stage = .Compressing
 }
 
 //game-specific teardown / reset logic
@@ -239,10 +250,17 @@ reset_game :: proc(game: ^Game) {}
 
 //game-specific update logic (run once per frame)
 game_update :: proc(game: ^Game, dt: f64) {
+	switch game.stage {
+	case .Compressing:
 	//update timer
 	//if time is up, end the round
 	//handle click & drag
 	//on drag stop, update the round message
+	case .Scoring:
+	//play scoring animation
+	case .GameOver:
+	//show new game button
+	}
 }
 
 game_specific_load :: proc(game: ^Game = game, save: ^GameSave) {
@@ -291,7 +309,12 @@ message_to_string :: proc(message: Message) -> string {
 	return result
 }
 
-split_message :: proc(message: Message) -> []Message {}
+split_message_into_tablets :: proc(
+	message: Message,
+	line_length, lines_per_tablet: int,
+) -> []Message {
+
+}
 //make message from string
 string_to_message :: proc(s: string) -> Message {
 	result := Message{}
