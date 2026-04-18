@@ -1,34 +1,33 @@
 package game
 
 import "core:fmt"
-import "core:slice"
-import "core:strconv"
-import "core:strings"
 import "core:unicode/utf8"
 import hm "handle_map_static"
 import maps "mapgen"
 import rl "vendor:raylib"
 
 //boilerplate / starter code for your game-specific logic in this engine
+GAME_NAME :: "compressiform"
 UI_MAIN_FONT_SIZE :: 72
 UI_SECONDARY_FONT_SIZE :: 42
 IN_GAME_FONT_SIZE :: 36
-GAME_NAME :: "compressiform"
 BACKGROUND_MAP_COLOR :: rl.Color{128, 128, 128, 255}
 CAMERA_MAP_COLOR :: rl.Color{99, 155, 255, 255}
+LETTERS_PER_LINE :: 20
+LINES_PER_TABLET :: 15
 @(rodata)
 LEVELS := []Level {
 	{
 		target_message = "Made for Ludum Dare 2026 by Nathaniel Saxe and Ryan Kann",
-		tablet_size = .Normal,
+		max_tablets = 1,
 		time_limit = 120,
 	},
 	{
 		target_message = "In a world where they never figured out paper, important messages are still sent overseas on stone tablets. You are in charge of compressing the longer messages to fit on a single stone tablet, saving your shipping company millions each year. First, let's do the basic due diligence of compacting the empty space in the message.",
-		tablet_size = .Normal,
+		max_tablets = 1,
 		time_limit = 180,
 	},
-	{target_message = "Now let's try another trick", tablet_size = .Normal, time_limit = 180},
+	{target_message = "Now let's try another trick", max_tablets = 1, time_limit = 180},
 }
 
 //object tags
@@ -53,26 +52,22 @@ SpawnType :: enum {
 	Backglevel,
 }
 
-TabletSize :: enum {
-	Small    = 10,
-	Smallish = 15,
-	Normal   = 20,
-	Biggish  = 25,
-	Big      = 30,
-}
 Level :: struct {
 	time_limit:     f64,
 	target_message: string,
 	minimum_loss:   f64,
-	tablet_size:    TabletSize,
+	max_tablets:    int,
 }
 LevelProgress :: struct {
 	level:   Level,
 	message: Message,
 }
-Letter :: distinct struct {
+Word :: struct {
 	str:  string,
 	size: f64,
+}
+Number :: struct {
+	number: int, //should be 0-9
 }
 //used for find/replace
 Equals :: distinct struct{}
@@ -89,14 +84,14 @@ MessageObjectType :: enum {
 	Pebble,
 }
 //some other random object that is stuck on the tablet
-Object :: distinct struct {
+MessageObject :: distinct struct {
 	type: MessageObjectType,
 }
 MessageElement :: union {
-	Letter,
+	Word,
+	Number,
 	Equals,
-	Times,
-	Object,
+	MessageObject,
 }
 Message :: [dynamic]MessageElement
 
@@ -313,29 +308,23 @@ message_to_string :: proc(message: Message) -> string {
 		//  [key: MessageElement] equals [value]
 		//  [number] times [value]
 		switch elem in element {
-		case Letter:
-			//first, attempt to parse
-			idx := i
-			num_str := elem.str
-			//parse until non-number
-			_, ok := strconv.parse_int(elem.str)
-			for ok {
-				idx += 1
+		case Number:
+			num := elem.number
+			for i < len(message) {
+				i += 1
 				next_element := message[i]
 				#partial switch next_el in next_element {
-				case Letter:
-					_, ok = strconv.parse_int(next_el.str)
-					if !ok {
-						break
-					}
-					num_str := strings.concatenate({num_str, next_el.str})
+				case Number:
+					num *= 10
+					num += next_el.number
 				case:
 					break
 				}
 			}
+
 		case Equals:
-		case Times:
-		case Object:
+		case MessageObject:
+		case Word:
 		}
 	}
 	return result
@@ -343,10 +332,10 @@ message_to_string :: proc(message: Message) -> string {
 
 split_message_into_tablets :: proc(
 	message: Message,
-	line_length, lines_per_tablet: int,
+	letters_per_line, lines_per_tablet: int,
 ) -> []Message {
 	messages := make([dynamic]Message, context.temp_allocator)
-	chunk_size := line_length * lines_per_tablet
+	chunk_size := letters_per_line * lines_per_tablet
 	i := 0
 	for i < len(message) {
 
@@ -357,7 +346,7 @@ split_message_into_tablets :: proc(
 string_to_message :: proc(s: string) -> Message {
 	result := Message{}
 	for c in s {
-		append(&result, Letter{str = utf8.runes_to_string({c})})
+		append(&result, Word{str = utf8.runes_to_string({c})})
 	}
 	return result
 }
@@ -365,18 +354,13 @@ string_to_message :: proc(s: string) -> Message {
 //called once at start of game
 //called at start of level
 spawn_tablets :: proc(level: Level, message: Message) -> []GameObjectHandle {
-	BASE_LINE_LENGTH :: 20
-	BASE_LINES_PER_TABLET :: 15
-	tablet_size_factor := f64(level.tablet_size) / f64(BASE_LINE_LENGTH)
 	//divide message into tablet-sized chunks
-	line_length := int(BASE_LINE_LENGTH * tablet_size_factor)
-	lines_per_tablet := int(BASE_LINES_PER_TABLET * tablet_size_factor)
-	tablet_messages := split_message_into_tablets(message, line_length, lines_per_tablet)
+	tablet_messages := split_message_into_tablets(message, LETTERS_PER_LINE, LINES_PER_TABLET)
 	//for each chunk, spawn tablet displaying that message
 	tablet_objects := [dynamic]GameObjectHandle{}
 	for tablet_message, i in tablet_messages {
 		//TODO tablet size / derive tablet pos
-		append(&tablet_objects, spawn_tablet({0, 0}, tablet_message))
+		append(&tablet_objects, spawn_tablet(game.camera_spawn_point, tablet_message))
 	}
 	return tablet_objects[:]
 }
