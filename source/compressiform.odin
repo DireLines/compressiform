@@ -245,7 +245,7 @@ reset_game :: proc(game: ^Game) {}
 game_update :: proc(game: ^Game, dt: f64) {
 	switch game.stage {
 	case .Compressing:
-		game.main_camera.position += 5000 * dt * vec2{get_axis(.A, .D), get_axis(.W, .S)}
+		game.main_camera.position += 1000 * dt * vec2{get_axis(.A, .D), get_axis(.W, .S)}
 	//update timer
 	//if time is up, end the round
 	//handle click & drag
