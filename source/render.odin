@@ -269,18 +269,20 @@ draw_tile :: proc(
 	if !info_provided {
 		info = TILE_PROPERTIES[tile.type]
 	}
-	wall, is_wall := info.wall_render_info.?
-	if !((render_layer == info.render_layer) || (is_wall && render_layer == wall.render_layer)) {
-		return
-	}
 	source := info.texture.rect
-	ceiling := is_wall && render_layer == info.render_layer
-	if (!is_wall) && ceiling {
-		return
-	}
-	if is_wall {
-		if !ceiling {
-			source = wall.texture.rect
+	if tile.type == .Wall {
+		neighbors := get_neighbors(id)
+		if get_tile(neighbors[.North]).type != .Wall {
+			source = atlas_textures[.Wood1].rect
+		}
+		if get_tile(neighbors[.South]).type != .Wall {
+			source = atlas_textures[.Wood0].rect
+		}
+		if get_tile(neighbors[.East]).type != .Wall {
+			source = atlas_textures[.Wood3].rect
+		}
+		if get_tile(neighbors[.West]).type != .Wall {
+			source = atlas_textures[.Wood2].rect
 		}
 	}
 	timer->count_toward("tile checks")
@@ -288,9 +290,6 @@ draw_tile :: proc(
 	offset := aabb.min
 	epsilon :: 0.0001 // handle seams btwn tiles
 	scale_amt := vec2{TILE_SIZE / source.width, TILE_SIZE / source.height} + epsilon
-	if is_wall && ceiling {
-		offset += CEILING_OFFSET
-	}
 	m := translate(offset) * scale(scale_amt) * TILE_ROTATION_MATRICES[tile.rotation]
 	timer->count_toward("compute tile transforms")
 	if info.texture != atlas_textures[.None] {
@@ -490,18 +489,7 @@ render :: proc() {
 				tile := get_tile(tile_id)
 				timer->count_toward("get_tile calls")
 				props := TILE_PROPERTIES[tile.type]
-				wall, is_wall := props.wall_render_info.?
-				on_main_layer := i == props.render_layer
-				on_wall_layer := is_wall && i == wall.render_layer
-				if !(on_main_layer || on_wall_layer) {
-					continue
-				}
-				if on_main_layer {
-					change_shader(props.shader, &curr_shader_name)
-				}
-				if on_wall_layer {
-					change_shader(wall.shader, &curr_shader_name)
-				}
+				change_shader(props.shader, &curr_shader_name)
 				color := rl.WHITE
 				if props.color.a != 0 {
 					color = props.color

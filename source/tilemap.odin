@@ -38,7 +38,6 @@ TextureDistribution :: []struct {
 TileTypeInfo :: struct {
 	using collision:   CollisionProperties,
 	using render_info: RenderInfo,
-	wall_render_info:  Maybe(RenderInfo),
 	random_rotation:   bool,
 }
 
@@ -121,14 +120,19 @@ get_tile :: proc(id: TilemapTileId) -> Tile {
 	return tilemap[id.x %% CHUNK_WIDTH_TILES][id.y %% CHUNK_HEIGHT_TILES]
 }
 
-get_neighbors :: proc(id: TilemapTileId) -> [4]TilemapTileId {
-	return {{id.x, id.y + 1}, {id.x, id.y - 1}, {id.x + 1, id.y}, {id.x - 1, id.y}}
+get_neighbors :: proc(id: TilemapTileId) -> [CardinalDirection]TilemapTileId {
+	return {
+		.South = {id.x, id.y + 1},
+		.North = {id.x, id.y - 1},
+		.East = {id.x + 1, id.y},
+		.West = {id.x - 1, id.y},
+	}
 }
 is_surrounded_by_same_tile :: proc(id: TilemapTileId) -> bool {
 	t := get_tile(id)
 	neighbors := get_neighbors(id)
 	#unroll for i in 0 ..< 4 {
-		neighbor := get_tile(neighbors[i])
+		neighbor := get_tile(neighbors[CardinalDirection(i)])
 		if neighbor.type != t.type {
 			return false
 		}
@@ -213,26 +217,26 @@ get_tilemap_corners :: proc {
 
 img_to_tilemap :: proc(
 	img: [][]rl.Color,
-	color_to_tile: proc(c: rl.Color) -> Tile,
+	get_tile: proc(c: rl.Color) -> Tile,
 ) -> (
 	tilemap: Tilemap,
-	player_spawn: TilemapTileId,
+	camera_spawn: TilemapTileId,
 ) {
 	w, h := len(img[0]), len(img)
 	tiles := maps.make_grid_slice(Tile, w, h)
 	for r in 0 ..< h {
 		for c in 0 ..< w {
-			tile := color_to_tile(img[r][c])
+			tile := get_tile(img[r][c])
 			props := TILE_PROPERTIES[tile.type]
 			tile.rotation = .North
 			if props.random_rotation {
 				tile.rotation = rand.choice_enum(CardinalDirection)
 			}
-			if tile.spawn == .Player {
-				player_spawn = TilemapTileId{r, c}
+			if tile.spawn == .Camera {
+				camera_spawn = TilemapTileId{r, c}
 			}
 			tiles[r][c] = tile
 		}
 	}
-	return tiles, player_spawn
+	return tiles, camera_spawn
 }

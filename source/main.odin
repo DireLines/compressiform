@@ -219,10 +219,6 @@ game_init_mem :: proc(game: ^Game) {
 	//init some globals
 	for props, tile_type in TILE_PROPERTIES {
 		tile_render_layers_used[props.render_layer] = {}
-		wall, is_wall := props.wall_render_info.?
-		if is_wall {
-			tile_render_layers_used[wall.render_layer] = {}
-		}
 	}
 	for dir in CardinalDirection {
 		degrees := (int(dir) - 2) * 90

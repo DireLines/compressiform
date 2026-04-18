@@ -1,5 +1,6 @@
 package game
 
+import "core:fmt"
 import "core:strconv"
 import "core:strings"
 import "core:unicode/utf8"
@@ -7,6 +8,9 @@ import maps "mapgen"
 import rl "vendor:raylib"
 
 //boilerplate / starter code for your game-specific logic in this engine
+UI_MAIN_FONT_SIZE :: 72
+UI_SECONDARY_FONT_SIZE :: 42
+IN_GAME_FONT_SIZE :: 36
 GAME_NAME :: "my game"
 BACKGROUND_MAP_COLOR :: rl.Color{128, 128, 128, 255}
 CAMERA_MAP_COLOR :: rl.Color{99, 155, 255, 255}
@@ -33,11 +37,9 @@ ObjectTag :: enum {
 
 SpawnType :: enum {
 	None,
-	Player,
-	Enemy,
-	Checkpoint,
+	Camera,
+	Background,
 }
-
 
 TabletSize :: enum {
 	Small,
@@ -103,7 +105,7 @@ GameSpecificGlobalState :: struct {
 	chunk_loading_mode: ChunkLoadingMode,
 	//we load the map immediately, but need to remember
 	//where to spawn the player when the player object is spawned later
-	player_spawn_point: vec2,
+	camera_spawn_point: vec2,
 	player_handle:      GameObjectHandle,
 	color_to_tiletype:  map[rl.Color]TileType,
 	color_to_spawn:     map[rl.Color]SpawnType,
@@ -117,8 +119,19 @@ GameSpecificGlobalState :: struct {
 //but those things will never apply to a collectible item
 //so Enemy and Collectible can be two variants in the union
 DefaultVariant :: distinct struct{}
+ButtonCallbackInfo :: struct {
+	game:          ^Game,
+	button:        GameObjectInst(UIButton),
+	button_handle: GameObjectHandle,
+}
+UIButton :: struct {
+	min_scale, max_scale: vec2,
+	on_click_start:       proc(info: ButtonCallbackInfo) `cbor:"-"`, //triggered when mouse button down and hovering button
+	on_click:             proc(info: ButtonCallbackInfo) `cbor:"-"`, //triggered when mouse button up and hovering button - most of the time this is what you want
+}
 GameObjectVariant :: union {
 	DefaultVariant,
+	UIButton,
 }
 
 //type constraints to check at runtime (outside of Odin's type system)
@@ -171,11 +184,7 @@ RenderLayer :: enum uint {
 //types of tiles
 TileType :: enum {
 	None,
-	Floor,
-	Wall_Left,
-	Wall_Right,
-	Wall_Solid,
-	Ceiling,
+	Wall,
 }
 //properties of each type of tile
 TILE_PROPERTIES := [TileType]TileTypeInfo {
@@ -184,29 +193,9 @@ TILE_PROPERTIES := [TileType]TileTypeInfo {
 		render_layer = uint(RenderLayer.Floor),
 		random_rotation = true,
 	},
-	.Floor = {
+	.Wall = {
 		collision = {layer = .Wall, resolve = true, trigger_events = true},
-		texture = atlas_textures[.Rock],
-		render_layer = uint(RenderLayer.Ceiling),
-	},
-	.Wall_Left = {
-		collision = {layer = .Wall, resolve = true, trigger_events = true},
-		texture = atlas_textures[.Rock],
-		render_layer = uint(RenderLayer.Ceiling),
-	},
-	.Wall_Solid = {
-		collision = {layer = .Wall, resolve = true, trigger_events = true},
-		texture = atlas_textures[.Rock],
-		render_layer = uint(RenderLayer.Ceiling),
-	},
-	.Wall_Right = {
-		collision = {layer = .Wall, resolve = true, trigger_events = true},
-		texture = atlas_textures[.Rock],
-		render_layer = uint(RenderLayer.Ceiling),
-	},
-	.Ceiling = {
-		collision = {layer = .Wall, resolve = true, trigger_events = true},
-		texture = atlas_textures[.Rock],
+		texture = atlas_textures[.Wood4],
 		render_layer = uint(RenderLayer.Ceiling),
 	},
 }
@@ -221,14 +210,14 @@ GameStage :: enum {
 //game-specific initialization logic (run once when game is started)
 //typically this will be "set up the main menu"
 game_start :: proc(game: ^Game) {
-	game.color_to_tiletype[rl.BLACK] = .Wall_Solid
+	game.color_to_tiletype[rl.BLACK] = .Wall
 	game.color_to_tiletype[BACKGROUND_MAP_COLOR] = .None
-	game.color_to_spawn[CAMERA_MAP_COLOR] = .Player
-	load_map :: proc() -> (tilemap: Tilemap, player_spawn: TilemapTileId) {
+	game.color_to_spawn[CAMERA_MAP_COLOR] = .Camera
+	load_map :: proc() -> (tilemap: Tilemap, camera_spawn: TilemapTileId) {
 		MAP_DATA :: #load("map.png")
 		tiles_img := rl.LoadImageFromMemory(".png", raw_data(MAP_DATA), i32(len(MAP_DATA)))
 		tiles_buf := maps.img_to_buf(tiles_img, transpose = true)
-		color_to_tile :: proc(c: rl.Color) -> Tile {
+		get_tile :: proc(c: rl.Color) -> Tile {
 			t := Tile{}
 			tiletype, ok := game.color_to_tiletype[c]
 			if ok {
@@ -240,8 +229,12 @@ game_start :: proc(game: ^Game) {
 			}
 			return t
 		}
-		return img_to_tilemap(tiles_buf, color_to_tile)
+		return img_to_tilemap(tiles_buf, get_tile)
 	}
+	player_spawn_tile: TilemapTileId
+	game.global_tilemap, player_spawn_tile = load_map()
+	game.camera_spawn_point = get_tile_center(player_spawn_tile)
+	game.main_camera.position = game.camera_spawn_point
 	game.stage = .Compressing
 }
 
@@ -252,6 +245,7 @@ reset_game :: proc(game: ^Game) {}
 game_update :: proc(game: ^Game, dt: f64) {
 	switch game.stage {
 	case .Compressing:
+		game.main_camera.position += 5000 * dt * vec2{get_axis(.A, .D), get_axis(.W, .S)}
 	//update timer
 	//if time is up, end the round
 	//handle click & drag
@@ -313,7 +307,7 @@ split_message_into_tablets :: proc(
 	message: Message,
 	line_length, lines_per_tablet: int,
 ) -> []Message {
-
+	return {}
 }
 //make message from string
 string_to_message :: proc(s: string) -> Message {
@@ -339,3 +333,40 @@ spawn_background :: proc() {}
 // start_round :: proc(round:Round) {}
 // score_round :: proc(round:Round) {}
 // end_current_round :: proc() {}
+get_axis :: proc(key_neg, key_pos: rl.KeyboardKey) -> f64 {
+	return f64(int(rl.IsKeyDown(key_pos))) - f64(int(rl.IsKeyDown(key_neg)))
+}
+
+spawn_button :: proc(
+	pos: vec2,
+	texture: TextureName, //TODO probably need to eventually supply hover / click animations
+	text: string,
+	on_click: proc(info: ButtonCallbackInfo),
+) -> GameObjectHandle {
+	tex := atlas_textures[texture]
+	min_scale :: vec2{3, 0.9}
+	button_obj := GameObject {
+		name = fmt.aprint(text, "button"),
+		text = text,
+		transform = {
+			position = pos,
+			rotation = 0,
+			scale = min_scale,
+			pivot = vec2{tex.rect.width, tex.rect.height} / 2,
+		},
+		render_info = {
+			texture = tex,
+			color = rl.WHITE,
+			render_layer = uint(RenderLayer.UI),
+			text_render_info = {font_size = UI_MAIN_FONT_SIZE},
+		},
+		tags = {.Sprite, .Text, .DoNotSerialize, .DontDestroyOnLoad},
+		variant = UIButton {
+			min_scale = min_scale,
+			max_scale = {min_scale.x * 1.3, min_scale.y},
+			on_click = on_click,
+		},
+		parent_handle = game.screen_space_parent_handle,
+	}
+	return spawn_object(button_obj)
+}
