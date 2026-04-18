@@ -188,22 +188,22 @@ game_specific_load :: proc(game: ^Game = game, save: ^GameSave) {
 }
 
 //decode message
-message_to_string :: proc(message: Message) -> string {}
+// message_to_string :: proc(message: Message) -> string {}
 //make message from string
-string_to_message :: proc(s: string) -> Message {}
+// string_to_message :: proc(s: string) -> Message {}
 
 
 //called once at start of game
-spawn_background :: proc() {}
+// spawn_background :: proc() {}
 //called at start of round
-spawn_tablets :: proc(message: Message) -> []GameObjectHandle {
-	//divide message into tablet-sized chunks
-	//for each chunk, spawn tablet displaying that message
-}
+// spawn_tablets :: proc(message: Message) -> []GameObjectHandle {
+//divide message into tablet-sized chunks
+//for each chunk, spawn tablet displaying that message
+// }
 //called from spawn_tablets
-spawn_tablet :: proc(pos: vec2, message: Message) -> GameObjectHandle {}
+// spawn_tablet :: proc(pos: vec2, message: Message) -> GameObjectHandle {}
 //called from spawn_tablet
-spawn_letter :: proc(pos: vec2, message: MessageElement) -> GameObjectHandle {}
+// spawn_letter :: proc(pos: vec2, message: MessageElement) -> GameObjectHandle {}
 // reset_round :: proc() {}
 // start_round :: proc(round:Round) {}
 // score_round :: proc(round:Round) {}
