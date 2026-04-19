@@ -35,13 +35,19 @@ TextAlignment :: enum {
 	Left,
 	Right,
 }
+VerticalTextAlignment :: enum {
+	Center,
+	Top,
+	Bottom,
+}
 
 //these are Maybes because the zero value is undesirable for all of them, need to know when to use a default
 TextRenderInfo :: struct {
-	font:           Maybe(rl.Font) `cbor:"-"`,
-	text_color:     Maybe(rl.Color),
-	font_size:      Maybe(f32),
-	text_alignment: TextAlignment,
+	font:                Maybe(rl.Font) `cbor:"-"`,
+	text_color:          Maybe(rl.Color),
+	font_size:           Maybe(f32),
+	text_alignment:      TextAlignment,
+	vert_text_alignment: VerticalTextAlignment,
 }
 
 ShaderName :: enum {

@@ -11,31 +11,30 @@ import rl "vendor:raylib"
 GAME_NAME :: "compressiform"
 UI_MAIN_FONT_SIZE :: 72
 UI_SECONDARY_FONT_SIZE :: 42
-IN_GAME_FONT_SIZE :: 36
+IN_GAME_FONT_SIZE :: 50
 BACKGROUND_MAP_COLOR :: rl.Color{128, 128, 128, 255}
 CAMERA_MAP_COLOR :: rl.Color{99, 155, 255, 255}
 STACK_START_COLOR :: rl.Color{255, 195, 59, 255}
 SLATE_GRAY :: rl.Color{210, 210, 220, 255}
-WORD_OBJECT_BASE_FONT_SIZE :: 50
 MENU_SCREEN_DIMS :: vec2{WINDOW_WIDTH, WINDOW_HEIGHT}
-LETTERS_PER_LINE :: 18
+LETTERS_PER_LINE :: 28
 LINES_PER_TABLET :: 10
 TABLET_THUD_SCREENSHAKE_AMT :: 20
 SCREENSHAKE_DECAY :: 18
 @(rodata)
 LEVELS := []Level {
 	{
-		target_message = "Made for Ludum Dare 59 by Nathaniel Saxe and Ryan Kann. -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ In a world where they never figured out paper, important messages are sent overseas on stone tablets like these. You are in charge of compressing longer messages until they can fit on a single boat, saving your shipping company millions each year. Speaking of which, this boat can only fit 3 stone tablets, so you'll have to figure out a way to make the message a bit smaller. Looks like '-_-_-_-_-_-_-_-_-_-_' is repeated a bunch of times in a row on the first tablet, maybe you can use a number as a shorthand for how many times that part of the message was repeated.",
+		target_message = "Made for Ludum Dare 59 by Nathaniel Saxe and Ryan Kann. -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ In a world where they never figured out paper, important messages are sent overseas on stone tablets like these. You are in charge of compressing longer messages until they can fit on a single boat, saving your shipping company millions each year. Speaking of which, this boat can only fit 3 stone tablets, so you'll have to figure out a way to make the message a bit smaller. Looks like '-_-_-_-_-_-_-_-_-_-_-_-_-_-_' is repeated a bunch of times in a row on the first tablet, maybe you can use a number as a shorthand for how many times that part of the message was repeated.",
 		max_tablets = 3,
 		time_limit = 180,
 	},
 	{
-		target_message = "Made for Ludum Dare 59 by Nathaniel Saxe and Ryan Kann. -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ Many copies of the same word in a row is unusual, though. We'll have to think of another trick. We've got all these pebbles lying around the warehouse. Maybe we can attach them to the tablet, along with instructions saying that whenever you see a white pebble, you should replace it with a particular word. You can use an equals sign to say '(white pebble) = the' and then replace all the ' the ' in this message with white pebbles.",
+		target_message = "Made for Ludum Dare 59 by Nathaniel Saxe and Ryan Kann. -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ Many copies of the same word in a row is unusual, though. We'll have to think of another trick. We've got all these pebbles lying around the warehouse. Maybe we can attach them to the tablet, along with instructions saying that whenever you see a white pebble, you should replace it with a particular word. You can use an equals sign to say '(white pebble) = the' and then replace all the ' the ' in this message with white pebbles.",
 		max_tablets = 3,
 		time_limit = 120,
 	},
 	{
-		target_message = "Made for Ludum Dare 59 by Nathaniel Saxe and Ryan Kann. -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ Ok let's be real, the person on the other end of the message probably doesn't need to know exactly how many of those dashes there were. The message still *means* about the same thing regardless. See if it still works if you just remove them entirely, as long as the actual meaning of the message is preserved I'm sure it will be understood.",
+		target_message = "Made for Ludum Dare 59 by Nathaniel Saxe and Ryan Kann. -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ Ok let's be real, the person on the other end of the message probably doesn't need to know exactly how many of those dashes there were. The message still *means* about the same thing regardless. See if it still works if you just remove them entirely, as long as the actual meaning of the message is preserved I'm sure it will be understood.",
 		max_tablets = 2,
 		time_limit = 120,
 	},
@@ -55,6 +54,7 @@ ObjectTag :: enum {
 	CustomDraw,
 	//user-defined tags
 	Draggable,
+	Fall,
 }
 
 SpawnType :: enum {
@@ -327,7 +327,7 @@ game_update :: proc(game: ^Game, dt: f64) {
 		game.main_camera.position += 1000 * dt * WASD()
 		//do gravity
 		{it := hm.make_iter(&game.objects)
-			for obj in all_objects_with_tags(&it, .Collide) {
+			for obj in all_objects_with_tags(&it, .Fall) {
 				GRAVITY_STRENGTH :: 800
 				obj.acceleration.y += GRAVITY_STRENGTH
 			}
@@ -354,6 +354,7 @@ game_update :: proc(game: ^Game, dt: f64) {
 							world_pos := local_to_world(h, child.position + tablet.pivot)
 							child.position = world_pos
 							child.parent_handle = nil
+							child.tags += {.Draggable}
 						}
 					}
 				}
@@ -439,6 +440,33 @@ message_to_string :: proc(message: Message) -> string {
 	return result
 }
 
+get_message_element_text :: proc(element: MessageElementContent) -> string {
+	text: string
+	switch content in element {
+	case Word:
+		text = content.str
+	case Number:
+		text = fmt.aprint(content.number)
+	case Equals:
+		text = "="
+	case MessageObject:
+		text = "."
+	}
+	return text
+}
+
+get_message_element_size :: proc(element: MessageElementContent) -> vec2 {
+	text := get_message_element_text(element)
+	letter_size: f64 = 1 //TODO this probably won't end up being implemented
+	font_size := f32(letter_size * IN_GAME_FONT_SIZE)
+	world_size_pix := rl.MeasureTextEx(
+		global_default_font,
+		strings.clone_to_cstring(text),
+		font_size,
+		0,
+	)
+	return vec2f32_to_vec2(world_size_pix)
+}
 
 //figure out the line, column and tablet number of all the things in the message
 //basically just laying out text into pages
@@ -448,22 +476,24 @@ set_message_element_positions :: proc(
 ) -> (
 	num_tablets_needed: int,
 ) {
-	get_message_element_length :: proc(element: MessageElementContent) -> f64 {
-		#partial switch content in element {
-		case Word:
-			return f64(len(content.str)) * content.letter_size
-		}
-		return 1
-	}
+	AVG_PIXELS_PER_LETTER: f64 : 22 //measured
+	WORD_SPACING_PIXELS: f64 : 20
 	tablet := 0
 	line := 0
 	column: f64 = 0
+	sum_ratios: f64 = 0
+	num_ratios: f64 = 0
 	for &element in message {
-		elem_len := get_message_element_length(element.content)
-		column += elem_len
+		elem_size := get_message_element_size(element.content)
+		elem_len := elem_size.x
+		elem_len_with_space := elem_len + WORD_SPACING_PIXELS
+		text := get_message_element_text(element.content)
+		sum_ratios += elem_len / f64(len(text))
+		num_ratios += 1
+		column += elem_len_with_space
 		//fix run off end of line
-		if column > f64(letters_per_line) {
-			column = elem_len
+		if column - WORD_SPACING_PIXELS > f64(letters_per_line) * AVG_PIXELS_PER_LETTER {
+			column = elem_len_with_space
 			line += 1
 		}
 		//fix run off end of tablet
@@ -471,8 +501,9 @@ set_message_element_positions :: proc(
 			line = 0
 			tablet += 1
 		}
-		element.position = {tablet, line, column - elem_len}
+		element.position = {tablet, line, column - elem_len_with_space}
 	}
+	print("alskjdasd", sum_ratios / num_ratios)
 	return tablet + 1
 }
 //make message from string
@@ -487,9 +518,12 @@ string_to_message :: proc(s: string) -> Message {
 	return result
 }
 
-get_draggables_at_cursor :: proc(cursor_pos: vec2) -> []GameObjectHandle {
-	return {}
-}
+// get_draggables_at_cursor :: proc(cursor_pos: vec2) -> []GameObjectHandle {
+// 	it := hm.make_iter(&game.objects)
+// 	for obj in all_objects_with_tags(&it, .Draggable) {
+// 		obj.hitbox
+// 	}
+// }
 
 drag_start :: proc() {
 
@@ -518,7 +552,7 @@ print_message :: proc(m: ^Message) {
 spawn_tablets :: proc(level: Level, message: ^Message) {
 	//divide message into tablet-sized chunks
 	num_tablets := set_message_element_positions(message, LETTERS_PER_LINE, LINES_PER_TABLET)
-	// print_message(message)
+	print_message(message)
 	//for each chunk, spawn tablet displaying that message
 	tablet_objects := [dynamic]GameObjectHandle{}
 	for i in 0 ..< num_tablets {
@@ -550,7 +584,7 @@ spawn_tablet :: proc(pos: vec2, message: ^Message, tablet_number: int) -> GameOb
 		},
 		velocity = {0, 100}, //throw it down
 		hitbox = {layer = .Default, shape = AABB{min = (-tex_dims / 2), max = tex_dims / 2}},
-		tags = {.Sprite, .Collide},
+		tags = {.Sprite, .Collide, .Fall},
 		variant = Tablet{},
 	}
 	tablet_handle := spawn_object(tablet_def)
@@ -561,21 +595,6 @@ spawn_tablet :: proc(pos: vec2, message: ^Message, tablet_number: int) -> GameOb
 	}
 	return tablet_handle
 }
-
-get_message_element_text :: proc(element: MessageElementContent) -> string {
-	text: string
-	switch content in element {
-	case Word:
-		text = content.str
-	case Number:
-		text = fmt.aprint(content.number)
-	case Equals:
-		text = "="
-	case MessageObject:
-		text = ""
-	}
-	return text
-}
 //called from spawn_tablet
 spawn_message_element_object :: proc(
 	element: MessageElement,
@@ -583,6 +602,8 @@ spawn_message_element_object :: proc(
 ) -> GameObjectHandle {
 	text := get_message_element_text(element.content)
 	letter_size: f64 = 1 //TODO this probably won't end up being implemented
+	font_size := f32(letter_size * IN_GAME_FONT_SIZE)
+	size := get_message_element_size(element.content)
 	obj_def := GameObject {
 		name = text,
 		position = get_start_position_within_tablet(
@@ -597,11 +618,12 @@ spawn_message_element_object :: proc(
 			texture = atlas_textures[.None],
 			text_render_info = {
 				text_color = SLATE_GRAY,
-				font_size = f32(letter_size * 50),
+				font_size = font_size,
 				text_alignment = .Left,
 			},
 		},
-		tags = {.Text, .Draggable},
+		hitbox = {shape = AABB{{}, size}},
+		tags = {.Text, .Collide},
 		text = text,
 	}
 	return spawn_object(obj_def)
@@ -611,10 +633,7 @@ get_start_position_within_tablet :: proc(tablet_rect: Rect, elem: MessageElement
 	line_width := tablet_rect.width * 0.8
 	line_height := (tablet_rect.height * 0.6) / LINES_PER_TABLET
 	top_corner_of_content := 0.1 * vec2{tablet_rect.width, tablet_rect.height} - {475, 300}
-	return(
-		top_corner_of_content +
-		{line_width * (elem.pos / LETTERS_PER_LINE), line_height * f64(elem.line)} \
-	)
+	return top_corner_of_content + {elem.pos, line_height * f64(elem.line)}
 }
 
 level_start :: proc(level: Level) {

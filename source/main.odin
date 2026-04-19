@@ -19,7 +19,7 @@ WINDOW_WIDTH :: 1200 * BASE_WINDOW_WIDTH
 WINDOW_HEIGHT :: 720 * BASE_WINDOW_WIDTH
 TARGET_FPS :: 60
 TEXTURE_PIXELS_PER_WORLD_UNIT :: 128 //at default scale of {1,1}
-SCREEN_PIXELS_PER_WORLD_UNIT: f64 : 0.75 //at initial camera zoom of 1
+SCREEN_PIXELS_PER_WORLD_UNIT: f64 : 1 //at initial camera zoom of 1
 MAIN_FONT: FontName : .Medieval_Sharp
 global_default_font: rl.Font //in case we need to draw some text but don't have the game in the context
 DEFAULT_FONT_SIZE :: 32
