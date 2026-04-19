@@ -1,6 +1,7 @@
 package game
 
 import "core:fmt"
+import "core:strings"
 import "core:unicode/utf8"
 import hm "handle_map_static"
 import maps "mapgen"
@@ -59,12 +60,13 @@ Level :: struct {
 	max_tablets:    int,
 }
 LevelProgress :: struct {
-	level:   Level,
-	message: Message,
+	level:          Level,
+	message:        Message,
+	time_remaining: f64,
 }
 Word :: struct {
-	str:  string,
-	size: f64,
+	str:         string,
+	letter_size: f64,
 }
 Number :: struct {
 	number: int, //should be 0-9
@@ -85,13 +87,22 @@ MessageObjectType :: enum {
 }
 //some other random object that is stuck on the tablet
 MessageObject :: distinct struct {
-	type: MessageObjectType,
+	type:                MessageObjectType,
+	get_message_content: proc() -> string,
 }
-MessageElement :: union {
+MessageElementContent :: union {
 	Word,
 	Number,
 	Equals,
 	MessageObject,
+}
+MessageElementPosition :: struct {
+	tablet, line: int,
+	pos:          f64,
+}
+MessageElement :: struct {
+	content:        MessageElementContent,
+	using position: MessageElementPosition,
 }
 Message :: [dynamic]MessageElement
 
@@ -248,14 +259,15 @@ game_start :: proc(game: ^Game) {
 	game.camera_spawn_point = get_tile_center(cam_spawn_tile)
 	game.main_camera.position = game.camera_spawn_point
 	//TODO spawn background
-	// spawn_object(
-	// 	{
-	// 		name = "background",
-	// 		parent_handle = game.screen_space_parent_handle,
-	// 		scale = {200, 200},
-	// 		texture = atlas_textures[.Darkrock],
-	// 	},
-	// )
+	spawn_object(
+		{
+			name = "background",
+			parent_handle = game.screen_space_parent_handle,
+			scale = {200, 200},
+			texture = atlas_textures[.Darkrock],
+			render_layer = uint(RenderLayer.Bottom),
+		},
+	)
 	game.stage = .Start
 }
 
@@ -276,8 +288,9 @@ game_update :: proc(game: ^Game, dt: f64) {
 	case .Start:
 		game.level = LEVELS[game.level_number]
 		level_start(game.level)
+		game.stage = .Compressing
 	case .Compressing:
-		game.main_camera.position += 1000 * dt * vec2{get_axis(.A, .D), get_axis(.W, .S)}
+		game.main_camera.position += 1000 * dt * WASD()
 	//update timer
 	//if time is up, end the level
 	//handle click & drag
@@ -307,65 +320,117 @@ message_to_string :: proc(message: Message) -> string {
 		//  a single element
 		//  [key: MessageElement] equals [value]
 		//  [number] times [value]
-		switch elem in element {
+		switch content in element.content {
 		case Number:
-			num := elem.number
+			repetitions := content.number
+			sb := strings.builder_make(); defer strings.builder_destroy(&sb)
 			for i < len(message) {
 				i += 1
 				next_element := message[i]
-				#partial switch next_el in next_element {
+				switch next_content in next_element.content {
 				case Number:
-					num *= 10
-					num += next_el.number
+					repetitions *= 10
+					repetitions += next_content.number
+				case Word:
+					for _ in 0 ..< repetitions {
+						fmt.sbprint(&sb, next_content.str)
+					}
+				case Equals:
+				//invalid
+				case MessageObject:
+				//
+				}
+			}
+		case Equals:
+		//should be unreachable if message is valid - if invalid, do nothing
+		case MessageObject:
+			if i < len(message) - 2 {
+				next_element := message[i + 1]
+				#partial switch next_content in next_element.content {
+				case Equals:
+				// handle_equals(message, i)
 				case:
 					break
 				}
 			}
-
-		case Equals:
-		case MessageObject:
 		case Word:
+			if i < len(message) - 2 {
+				next_element := message[i + 1]
+				#partial switch next_content in next_element.content {
+				case Equals:
+				// handle_equals(message, i)
+				case:
+					break
+				}
+			}
 		}
 	}
 	return result
 }
 
-split_message_into_tablets :: proc(
-	message: Message,
-	letters_per_line, lines_per_tablet: int,
-) -> []Message {
-	messages := make([dynamic]Message, context.temp_allocator)
-	chunk_size := letters_per_line * lines_per_tablet
-	i := 0
-	for i < len(message) {
 
+//figure out the line, column and tablet number of all the things in the message
+//basically just laying out text into pages
+set_message_element_positions :: proc(
+	message: ^Message,
+	letters_per_line, lines_per_tablet: int,
+) -> (
+	num_tablets_needed: int,
+) {
+	get_message_element_length :: proc(element: MessageElementContent) -> f64 {
+		#partial switch content in element {
+		case Word:
+			return f64(len(content.str)) * content.letter_size
+		}
+		return 1
 	}
-	return messages[:]
+	tablet := 0
+	line := 0
+	column: f64 = 0
+	for &element in message {
+		elem_len := get_message_element_length(element.content)
+		column += elem_len
+		//fix run off end of line
+		if column > f64(letters_per_line) {
+			column = elem_len
+			line += 1
+		}
+		//fix run off end of tablet
+		if line > lines_per_tablet {
+			line = 0
+			tablet += 1
+		}
+		element.position = {line, tablet, column - elem_len}
+	}
+	return tablet + 1
 }
 //make message from string
 string_to_message :: proc(s: string) -> Message {
 	result := Message{}
 	for c in s {
-		append(&result, Word{str = utf8.runes_to_string({c})})
+		append(
+			&result,
+			MessageElement{content = Word{str = utf8.runes_to_string({c}), letter_size = 1}},
+		)
 	}
 	return result
 }
 
 //called once at start of game
 //called at start of level
-spawn_tablets :: proc(level: Level, message: Message) -> []GameObjectHandle {
+spawn_tablets :: proc(level: Level, message: ^Message) -> []GameObjectHandle {
 	//divide message into tablet-sized chunks
-	tablet_messages := split_message_into_tablets(message, LETTERS_PER_LINE, LINES_PER_TABLET)
+	num_tablets := set_message_element_positions(message, LETTERS_PER_LINE, LINES_PER_TABLET)
 	//for each chunk, spawn tablet displaying that message
 	tablet_objects := [dynamic]GameObjectHandle{}
-	for tablet_message, i in tablet_messages {
+	for i in 0 ..< num_tablets {
 		//TODO tablet size / derive tablet pos
-		append(&tablet_objects, spawn_tablet(game.camera_spawn_point, tablet_message))
+		append(&tablet_objects, spawn_tablet(game.camera_spawn_point, message))
 	}
 	return tablet_objects[:]
 }
 //called from spawn_tablets
-spawn_tablet :: proc(pos: vec2, message: Message) -> GameObjectHandle {
+spawn_tablet :: proc(pos: vec2, message: ^Message) -> GameObjectHandle {
 	//TODO
 	return {}
 }
@@ -376,13 +441,16 @@ spawn_message_element_object :: proc(
 ) -> GameObjectHandle {return {}}
 level_start :: proc(level: Level) {
 	message := string_to_message(level.target_message)
-	tablet_objects := spawn_tablets(level, message)
+	tablet_objects := spawn_tablets(level, &message)
 }
 level_end :: proc(level: Level) {}
 level_score :: proc(level: Level) {}
 // end_current_level :: proc() {}
 get_axis :: proc(key_neg, key_pos: rl.KeyboardKey) -> f64 {
 	return f64(int(rl.IsKeyDown(key_pos))) - f64(int(rl.IsKeyDown(key_neg)))
+}
+WASD :: proc() -> vec2 {
+	return {get_axis(.A, .D), get_axis(.W, .S)}
 }
 
 spawn_button :: proc(

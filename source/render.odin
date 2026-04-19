@@ -420,7 +420,7 @@ object_list_display_start_index: int
 render :: proc() {
 	timer := timer()
 	//figure out which objects are on screen
-	chunks_near_cam := get_chunks_near_cam(1)
+	chunks_near_cam := get_chunks_near_cam(2)
 	clear_map(&objects_to_draw)
 	for chunk, i in chunks_near_cam {
 		aabb := get_chunk_aabb(chunk)
