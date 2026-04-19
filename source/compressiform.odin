@@ -18,21 +18,16 @@ STACK_START_COLOR :: rl.Color{255, 195, 59, 255}
 SLATE_GRAY :: rl.Color{210, 210, 220, 255}
 WORD_OBJECT_BASE_FONT_SIZE :: 50
 MENU_SCREEN_DIMS :: vec2{WINDOW_WIDTH, WINDOW_HEIGHT}
-LETTERS_PER_LINE :: 15
+LETTERS_PER_LINE :: 18
 LINES_PER_TABLET :: 10
 TABLET_THUD_SCREENSHAKE_AMT :: 20
 SCREENSHAKE_DECAY :: 18
 @(rodata)
 LEVELS := []Level {
 	{
-		target_message = "Made for Ludum Dare 2026 by Nathaniel Saxe and Ryan Kann.",
+		target_message = "Made for Ludum Dare 2026 by Nathaniel Saxe and Ryan Kann. -------------------- -------------------- -------------------- -------------------- -------------------- -------------------- -------------------- -------------------- In a world where they never figured out paper, important messages are sent overseas on stone tablets like these. You are in charge of compressing longer messages until they can fit on a single boat, saving your shipping company millions each year.",
 		max_tablets = 1,
 		time_limit = 120,
-	},
-	{
-		target_message = "In a world where they never figured out paper, important messages are sent overseas on stone tablets like these. You are in charge of compressing longer messages until they can fit on a single boat, saving your shipping company millions each year.",
-		max_tablets = 1,
-		time_limit = 180,
 	},
 	{target_message = "Now let's try another trick", max_tablets = 1, time_limit = 180},
 }
@@ -302,7 +297,6 @@ reset_game :: proc(g: ^Game = game) {
 	recreate_final_transforms(g)
 	g.frame_counter = 0
 	g.screen_space_parent_handle = spawn_object(GameObject{name = "screen space parent"})
-	game.level_number = 1
 }
 
 //game-specific update logic (run once per frame)
@@ -495,14 +489,16 @@ print_message :: proc(m: ^Message) {
 spawn_tablets :: proc(level: Level, message: ^Message) {
 	//divide message into tablet-sized chunks
 	num_tablets := set_message_element_positions(message, LETTERS_PER_LINE, LINES_PER_TABLET)
-	print_message(message)
+	// print_message(message)
 	//for each chunk, spawn tablet displaying that message
 	tablet_objects := [dynamic]GameObjectHandle{}
 	for i in 0 ..< num_tablets {
 		tablet_start_height :: 1500
 		tablet_offset: vec2 : {1200, -800}
 		spawn_tablet(
-			game.tablet_stack_bottom - {0, tablet_start_height} + f64(i) * tablet_offset,
+			game.tablet_stack_bottom -
+			{tablet_offset.x, tablet_start_height} +
+			f64(i) * tablet_offset,
 			message,
 			i,
 		)
@@ -565,7 +561,11 @@ spawn_message_element_object :: proc(
 		render_info = {
 			render_layer = uint(RenderLayer.Ceiling),
 			texture = atlas_textures[.None],
-			text_render_info = {text_color = SLATE_GRAY, font_size = f32(letter_size * 50)},
+			text_render_info = {
+				text_color = SLATE_GRAY,
+				font_size = f32(letter_size * 50),
+				text_alignment = .Left,
+			},
 		},
 		tags = {.Text, .Draggable},
 		text = text,
@@ -575,8 +575,8 @@ spawn_message_element_object :: proc(
 
 get_start_position_within_tablet :: proc(tablet_rect: Rect, elem: MessageElementPosition) -> vec2 {
 	line_width := tablet_rect.width * 0.8
-	line_height := (tablet_rect.height * 0.8) / LINES_PER_TABLET
-	top_corner_of_content := 0.1 * vec2{tablet_rect.width, tablet_rect.height} - {300, 300}
+	line_height := (tablet_rect.height * 0.6) / LINES_PER_TABLET
+	top_corner_of_content := 0.1 * vec2{tablet_rect.width, tablet_rect.height} - {450, 300}
 	return(
 		top_corner_of_content +
 		{line_width * (elem.pos / LETTERS_PER_LINE), line_height * f64(elem.line)} \
@@ -623,7 +623,7 @@ spawn_button :: proc(
 		tags = {.Sprite, .Text, .DoNotSerialize, .DontDestroyOnLoad},
 		variant = UIButton {
 			min_scale = min_scale,
-			max_scale = {min_scale.x * 1.3, min_scale.y},
+			max_scale = {min_scale.x * 1.3, min_scale.y * 1.3},
 			on_click = on_click,
 		},
 		parent_handle = game.screen_space_parent_handle,
