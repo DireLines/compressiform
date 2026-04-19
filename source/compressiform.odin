@@ -14,20 +14,23 @@ UI_SECONDARY_FONT_SIZE :: 42
 IN_GAME_FONT_SIZE :: 36
 BACKGROUND_MAP_COLOR :: rl.Color{128, 128, 128, 255}
 CAMERA_MAP_COLOR :: rl.Color{99, 155, 255, 255}
+STACK_START_COLOR :: rl.Color{255, 195, 59, 255}
+SLATE_GRAY :: rl.Color{210, 210, 220, 255}
+WORD_OBJECT_BASE_FONT_SIZE :: 50
+MENU_SCREEN_DIMS :: vec2{WINDOW_WIDTH, WINDOW_HEIGHT}
 LETTERS_PER_LINE :: 15
 LINES_PER_TABLET :: 10
-TABLET_STACK_FLOOR_TILE: TilemapTileId : {219, 188} //got this by measuring in world
 TABLET_THUD_SCREENSHAKE_AMT :: 20
 SCREENSHAKE_DECAY :: 18
 @(rodata)
 LEVELS := []Level {
 	{
-		target_message = "Made for Ludum Dare 2026 by Nathaniel Saxe and Ryan Kann",
+		target_message = "Made for Ludum Dare 2026 by Nathaniel Saxe and Ryan Kann.",
 		max_tablets = 1,
 		time_limit = 120,
 	},
 	{
-		target_message = "In a world where they never figured out paper, important messages are still sent overseas on stone tablets. You are in charge of compressing the longer messages to fit on a single stone tablet, saving your shipping company millions each year. First, let's do the basic due diligence of compacting the empty space in the message.",
+		target_message = "In a world where they never figured out paper, important messages are sent overseas on stone tablets like these. You are in charge of compressing longer messages until they can fit on a single boat, saving your shipping company millions each year.",
 		max_tablets = 1,
 		time_limit = 180,
 	},
@@ -53,6 +56,7 @@ ObjectTag :: enum {
 SpawnType :: enum {
 	None,
 	Camera,
+	Stack,
 	Background,
 }
 
@@ -226,13 +230,14 @@ TILE_PROPERTIES := [TileType]TileTypeInfo {
 	.Wall = {
 		collision = {layer = .Wall, resolve = true, trigger_events = true},
 		texture = atlas_textures[.Wood4],
-		render_layer = uint(RenderLayer.Ceiling),
+		render_layer = uint(RenderLayer.Floor),
 	},
 }
 
 //this keeps track of whether you are in the menu or in the game
 GameStage :: enum {
-	Start,
+	Init,
+	Started,
 	Compressing,
 	Scoring,
 	GameOver,
@@ -242,9 +247,11 @@ GameStage :: enum {
 //typically this will be "set up the main menu"
 game_start :: proc(game: ^Game) {
 	game.color_to_tiletype[rl.BLACK] = .Wall
+	game.color_to_tiletype[STACK_START_COLOR] = .Wall
 	game.color_to_tiletype[BACKGROUND_MAP_COLOR] = .None
 	game.color_to_spawn[CAMERA_MAP_COLOR] = .Camera
-	load_map :: proc() -> (tilemap: Tilemap, camera_spawn: TilemapTileId) {
+	game.color_to_spawn[STACK_START_COLOR] = .Stack
+	load_map :: proc() -> (tilemap: Tilemap, camera_spawn, stack_start: TilemapTileId) {
 		MAP_DATA :: #load("map.png")
 		tiles_img := rl.LoadImageFromMemory(".png", raw_data(MAP_DATA), i32(len(MAP_DATA)))
 		tiles_buf := maps.img_to_buf(tiles_img, transpose = true)
@@ -262,9 +269,10 @@ game_start :: proc(game: ^Game) {
 		}
 		return img_to_tilemap(tiles_buf, get_tile)
 	}
-	cam_spawn_tile: TilemapTileId
-	game.global_tilemap, cam_spawn_tile = load_map()
+	cam_spawn_tile, stack_start_tile: TilemapTileId
+	game.global_tilemap, cam_spawn_tile, stack_start_tile = load_map()
 	game.camera_spawn_point = get_tile_center(cam_spawn_tile)
+	game.tablet_stack_bottom = get_tile_center(stack_start_tile) - {0, TILE_SIZE / 2}
 	game.main_camera.position = game.camera_spawn_point
 	//TODO spawn background
 	spawn_object(
@@ -276,8 +284,14 @@ game_start :: proc(game: ^Game) {
 			render_layer = uint(RenderLayer.Bottom),
 		},
 	)
-	game.level_number = 1
-	game.stage = .Start
+	spawn_button(MENU_SCREEN_DIMS * {0.5, 0.5}, .White, "Start", proc(info: ButtonCallbackInfo) {
+		game.stage = .Started
+		if ODIN_OS == .JS && !rl.IsAudioDeviceReady() {
+			rl.InitAudioDevice()
+		}
+		hm.remove(&game.objects, info.button.handle)
+	})
+	game.stage = .Init
 }
 
 //game-specific teardown / reset logic
@@ -288,14 +302,16 @@ reset_game :: proc(g: ^Game = game) {
 	recreate_final_transforms(g)
 	g.frame_counter = 0
 	g.screen_space_parent_handle = spawn_object(GameObject{name = "screen space parent"})
-	g.tablet_stack_bottom = get_tile_center(TABLET_STACK_FLOOR_TILE) - {0, TILE_SIZE / 2}
+	game.level_number = 1
 }
 
 //game-specific update logic (run once per frame)
 game_update :: proc(game: ^Game, dt: f64) {
 	timer := timer()
+	handle_ui_buttons()
 	switch game.stage {
-	case .Start:
+	case .Init:
+	case .Started:
 		game.level = LEVELS[game.level_number]
 		level_start(game.level)
 		rl.PlaySound(get_sound("tablet-whoosh.wav"))
@@ -451,9 +467,11 @@ set_message_element_positions :: proc(
 //make message from string
 string_to_message :: proc(s: string) -> Message {
 	result := Message{}
-	words := strings.split_multi(s, {" ", ",", "."})
+	words := strings.split(s, " ")
 	for word in words {
-		append(&result, MessageElement{content = Word{str = word, letter_size = 1}})
+		if word != "" {
+			append(&result, MessageElement{content = Word{str = word, letter_size = 1}})
+		}
 	}
 	return result
 }
@@ -481,9 +499,10 @@ spawn_tablets :: proc(level: Level, message: ^Message) {
 	//for each chunk, spawn tablet displaying that message
 	tablet_objects := [dynamic]GameObjectHandle{}
 	for i in 0 ..< num_tablets {
-		tablet_height :: 1500
+		tablet_start_height :: 1500
+		tablet_offset: vec2 : {1200, -800}
 		spawn_tablet(
-			game.tablet_stack_bottom - f64(num_tablets - i) * vec2{0, tablet_height},
+			game.tablet_stack_bottom - {0, tablet_start_height} + f64(i) * tablet_offset,
 			message,
 			i,
 		)
@@ -495,13 +514,13 @@ spawn_tablet :: proc(pos: vec2, message: ^Message, tablet_number: int) -> GameOb
 	tex := atlas_textures[.Tablet]
 	tex_dims := vec2{tex.rect.width, tex.rect.height}
 	scale := vec2{1, 1}
-	tablet := GameObject {
+	tablet_def := GameObject {
 		name = fmt.aprint("tablet", tablet_number),
 		transform = {position = pos, scale = scale, pivot = {tex_dims.x / 2, tex_dims.y / 2}},
 		render_info = {
 			texture = tex,
 			color = rl.WHITE,
-			render_layer = uint(RenderLayer.Bullet),
+			render_layer = uint(RenderLayer.Floor),
 			keep_original_dimensions = true,
 		},
 		velocity = {0, 100}, //throw it down
@@ -509,18 +528,60 @@ spawn_tablet :: proc(pos: vec2, message: ^Message, tablet_number: int) -> GameOb
 		tags = {.Sprite, .Collide},
 		variant = Tablet{},
 	}
-	tablet_handle := spawn_object(tablet)
+	tablet_handle := spawn_object(tablet_def)
+	tablet := get_object(tablet_handle, Tablet)
 	for element in message {
 		if element.tablet != tablet_number {continue}
-		spawn_message_element_object(element, tablet_handle)
+		spawn_message_element_object(element, tablet)
 	}
 	return tablet_handle
 }
 //called from spawn_tablet
 spawn_message_element_object :: proc(
 	element: MessageElement,
-	parent: GameObjectHandle,
-) -> GameObjectHandle {return {}}
+	tablet: GameObjectInst(Tablet),
+) -> GameObjectHandle {
+	text: string
+	letter_size: f64 = 1
+	switch content in element.content {
+	case Word:
+		text = content.str
+		letter_size = content.letter_size
+	case Number:
+		text = fmt.aprint(content.number)
+	case Equals:
+		text = "="
+	case MessageObject:
+		text = ""
+	}
+	obj_def := GameObject {
+		name = text,
+		position = get_start_position_within_tablet(
+			aabb_to_rect(tablet.hitbox.shape.(AABB)),
+			element.position,
+		),
+		scale = {1, 1},
+		parent_handle = tablet.handle,
+		render_info = {
+			render_layer = uint(RenderLayer.Ceiling),
+			texture = atlas_textures[.None],
+			text_render_info = {text_color = SLATE_GRAY, font_size = f32(letter_size * 50)},
+		},
+		tags = {.Text, .Draggable},
+		text = text,
+	}
+	return spawn_object(obj_def)
+}
+
+get_start_position_within_tablet :: proc(tablet_rect: Rect, elem: MessageElementPosition) -> vec2 {
+	line_width := tablet_rect.width * 0.8
+	line_height := (tablet_rect.height * 0.8) / LINES_PER_TABLET
+	top_corner_of_content := 0.1 * vec2{tablet_rect.width, tablet_rect.height} - {300, 300}
+	return(
+		top_corner_of_content +
+		{line_width * (elem.pos / LETTERS_PER_LINE), line_height * f64(elem.line)} \
+	)
+}
 
 level_start :: proc(level: Level) {
 	message := string_to_message(level.target_message)
@@ -555,9 +616,9 @@ spawn_button :: proc(
 		},
 		render_info = {
 			texture = tex,
-			color = rl.WHITE,
+			color = rl.DARKGRAY,
 			render_layer = uint(RenderLayer.UI),
-			text_render_info = {font_size = UI_MAIN_FONT_SIZE},
+			text_render_info = {font_size = UI_MAIN_FONT_SIZE, text_color = SLATE_GRAY},
 		},
 		tags = {.Sprite, .Text, .DoNotSerialize, .DontDestroyOnLoad},
 		variant = UIButton {
@@ -568,4 +629,39 @@ spawn_button :: proc(
 		parent_handle = game.screen_space_parent_handle,
 	}
 	return spawn_object(button_obj)
+}
+
+handle_ui_buttons :: proc() {
+	mouse_screen_pos := linalg.to_f64(rl.GetMousePosition())
+	it := hm.make_iter(&game.objects)
+	for button, button_handle in all_objects_with_variant(&it, UIButton) {
+		if game.clicked_ui_object != nil && game.clicked_ui_object != button_handle {continue}
+		screen_aabb := get_texture_aabb_for_object(
+			button.obj,
+			game.final_transforms[button_handle.idx].transform,
+		)
+		hovering := is_point_in_aabb(mouse_screen_pos, screen_aabb)
+		//TODO skip this stuff if there is another active UI interaction such as being in the middle of a slider drag
+		scale_target := button.min_scale
+		if hovering {
+			scale_target = button.max_scale
+		}
+		button.scale *= 1 + (scale_target - button.scale) * 0.1
+		// clicking := hovering && rl.IsMouseButtonDown(.LEFT)
+		if hovering {
+			button.color = SLATE_GRAY
+			button.text_color = rl.DARKGRAY
+		} else {
+			button.color = rl.DARKGRAY
+			button.text_color = SLATE_GRAY
+		}
+		click_started := hovering && rl.IsMouseButtonPressed(.LEFT)
+		if click_started && button.on_click_start != nil {
+			button.on_click_start({game, button, button_handle})
+		}
+		click_released := hovering && rl.IsMouseButtonReleased(.LEFT)
+		if click_released && button.on_click != nil {
+			button.on_click({game, button, button_handle})
+		}
+	}
 }

@@ -220,7 +220,7 @@ img_to_tilemap :: proc(
 	get_tile: proc(c: rl.Color) -> Tile,
 ) -> (
 	tilemap: Tilemap,
-	camera_spawn: TilemapTileId,
+	camera_spawn, stack_start: TilemapTileId,
 ) {
 	w, h := len(img[0]), len(img)
 	tiles := maps.make_grid_slice(Tile, w, h)
@@ -235,8 +235,11 @@ img_to_tilemap :: proc(
 			if tile.spawn == .Camera {
 				camera_spawn = TilemapTileId{r, c}
 			}
+			if tile.spawn == .Stack {
+				stack_start = TilemapTileId{r, c}
+			}
 			tiles[r][c] = tile
 		}
 	}
-	return tiles, camera_spawn
+	return tiles, camera_spawn, stack_start
 }
