@@ -296,14 +296,14 @@ game_update :: proc(game: ^Game, dt: f64) {
 		//do gravity
 		{it := hm.make_iter(&game.objects)
 			for it in all_objects_with_tags(&it, .Collide) {
-				GRAVITY_STRENGTH :: 9.8 * 10
+				GRAVITY_STRENGTH :: 980
 				it.acceleration += {0, GRAVITY_STRENGTH}
 			}
 		}
 		mouse_screen_pos := linalg.to_f64(rl.GetMousePosition())
 		mouse_pos := screen_to_world(linalg.to_f64(rl.GetMousePosition()), screen_conversion)
 		mouse_tile := get_containing_tile(mouse_pos)
-		print(mouse_pos, mouse_tile)
+	// print(mouse_pos, mouse_tile)
 
 	//update timer
 	//if time is up, end the level
@@ -449,9 +449,9 @@ spawn_tablets :: proc(level: Level, message: ^Message) {
 //called from spawn_tablets
 spawn_tablet :: proc(pos: vec2, message: ^Message, tablet_number: int) -> GameObjectHandle {
 	//shoot bullet
-	tex := atlas_textures[.Tablet100_Tablets]
+	tex := atlas_textures[.Tablet]
 	tex_dims := vec2{tex.rect.width, tex.rect.height}
-	scale := vec2{0.5, 0.5}
+	scale := vec2{1, 1}
 	tablet := GameObject {
 		name = fmt.aprint("tablet", tablet_number),
 		transform = {position = pos, scale = scale, pivot = {tex_dims.x / 2, tex_dims.y / 2}},
@@ -461,6 +461,7 @@ spawn_tablet :: proc(pos: vec2, message: ^Message, tablet_number: int) -> GameOb
 			render_layer = uint(RenderLayer.Bullet),
 			keep_original_dimensions = true,
 		},
+		velocity = {0, 100}, //throw it down
 		hitbox = {layer = .Default, shape = AABB{min = (-tex_dims / 2), max = tex_dims / 2}},
 		tags = {.Sprite, .Collide},
 	}
