@@ -10172,49 +10172,59 @@ function checkIncomingModuleAPI() {
   ignoredModuleProp('fetchSettings');
 }
 var ASM_CONSTS = {
-  11338838: () => { if (document.fullscreenElement) return 1; },  
- 11338884: () => { return Module.canvas.width; },  
- 11338916: () => { return parseInt(Module.canvas.style.width); },  
- 11338964: () => { document.exitFullscreen(); },  
- 11338991: () => { setTimeout(function(){ Module.requestFullscreen(false, false); }, 100); },  
- 11339063: () => { if (document.fullscreenElement) return 1; },  
- 11339109: () => { return Module.canvas.width; },  
- 11339141: () => { return screen.width; },  
- 11339166: () => { document.exitFullscreen(); },  
- 11339193: ($0) => { const canvasId = UTF8ToString($0); setTimeout(function() { Module.requestFullscreen(false, true); setTimeout(function() { document.querySelector(canvasId).style.width="unset"; }, 100); }, 100); },  
- 11339387: () => { return window.innerWidth; },  
- 11339413: () => { return window.innerHeight; },  
- 11339440: () => { if (document.fullscreenElement) return 1; },  
- 11339486: () => { return Module.canvas.width; },  
- 11339518: () => { return parseInt(Module.canvas.style.width); },  
- 11339566: () => { if (document.fullscreenElement) return 1; },  
- 11339612: () => { return Module.canvas.width; },  
- 11339644: () => { return screen.width; },  
- 11339669: () => { return window.innerWidth; },  
- 11339695: () => { return window.innerHeight; },  
- 11339722: () => { if (document.fullscreenElement) return 1; },  
- 11339768: () => { return Module.canvas.width; },  
- 11339800: () => { return screen.width; },  
- 11339825: () => { document.exitFullscreen(); },  
- 11339852: () => { if (document.fullscreenElement) return 1; },  
- 11339898: () => { return Module.canvas.width; },  
- 11339930: () => { return parseInt(Module.canvas.style.width); },  
- 11339978: () => { document.exitFullscreen(); },  
- 11340005: ($0) => { Module.canvas.style.opacity = $0; },  
- 11340043: () => { return screen.width; },  
- 11340068: () => { return screen.height; },  
- 11340094: () => { return window.screenX; },  
- 11340121: () => { return window.screenY; },  
- 11340148: () => { return window.devicePixelRatio; },  
- 11340184: ($0) => { navigator.clipboard.writeText(UTF8ToString($0)); },  
- 11340237: ($0) => { Module.canvas.style.cursor = UTF8ToString($0); },  
- 11340288: () => { Module.canvas.style.cursor = 'none'; },  
- 11340325: ($0, $1, $2, $3) => { try { navigator.getGamepads()[$0].vibrationActuator.playEffect('dual-rumble', { startDelay: 0, duration: $3, weakMagnitude: $1, strongMagnitude: $2 }); } catch (e) { try { navigator.getGamepads()[$0].hapticActuators[0].pulse($2, $3); } catch (e) { } } },  
- 11340581: ($0) => { Module.canvas.style.cursor = UTF8ToString($0); },  
- 11340632: () => { if (document.pointerLockElement) return 1; },  
- 11340679: () => { if (document.fullscreenElement) return 1; },  
- 11340725: () => { return window.innerWidth; },  
- 11340751: () => { return window.innerHeight; }
+  18832894: () => { if (document.fullscreenElement) return 1; },  
+ 18832940: () => { return Module.canvas.width; },  
+ 18832972: () => { return parseInt(Module.canvas.style.width); },  
+ 18833020: () => { document.exitFullscreen(); },  
+ 18833047: () => { setTimeout(function(){ Module.requestFullscreen(false, false); }, 100); },  
+ 18833119: () => { if (document.fullscreenElement) return 1; },  
+ 18833165: () => { return Module.canvas.width; },  
+ 18833197: () => { return screen.width; },  
+ 18833222: () => { document.exitFullscreen(); },  
+ 18833249: ($0) => { const canvasId = UTF8ToString($0); setTimeout(function() { Module.requestFullscreen(false, true); setTimeout(function() { document.querySelector(canvasId).style.width="unset"; }, 100); }, 100); },  
+ 18833443: () => { return window.innerWidth; },  
+ 18833469: () => { return window.innerHeight; },  
+ 18833496: () => { if (document.fullscreenElement) return 1; },  
+ 18833542: () => { return Module.canvas.width; },  
+ 18833574: () => { return parseInt(Module.canvas.style.width); },  
+ 18833622: () => { if (document.fullscreenElement) return 1; },  
+ 18833668: () => { return Module.canvas.width; },  
+ 18833700: () => { return screen.width; },  
+ 18833725: () => { return window.innerWidth; },  
+ 18833751: () => { return window.innerHeight; },  
+ 18833778: () => { if (document.fullscreenElement) return 1; },  
+ 18833824: () => { return Module.canvas.width; },  
+ 18833856: () => { return screen.width; },  
+ 18833881: () => { document.exitFullscreen(); },  
+ 18833908: () => { if (document.fullscreenElement) return 1; },  
+ 18833954: () => { return Module.canvas.width; },  
+ 18833986: () => { return parseInt(Module.canvas.style.width); },  
+ 18834034: () => { document.exitFullscreen(); },  
+ 18834061: ($0) => { Module.canvas.style.opacity = $0; },  
+ 18834099: () => { return screen.width; },  
+ 18834124: () => { return screen.height; },  
+ 18834150: () => { return window.screenX; },  
+ 18834177: () => { return window.screenY; },  
+ 18834204: () => { return window.devicePixelRatio; },  
+ 18834240: ($0) => { navigator.clipboard.writeText(UTF8ToString($0)); },  
+ 18834293: ($0) => { Module.canvas.style.cursor = UTF8ToString($0); },  
+ 18834344: () => { Module.canvas.style.cursor = 'none'; },  
+ 18834381: ($0, $1, $2, $3) => { try { navigator.getGamepads()[$0].vibrationActuator.playEffect('dual-rumble', { startDelay: 0, duration: $3, weakMagnitude: $1, strongMagnitude: $2 }); } catch (e) { try { navigator.getGamepads()[$0].hapticActuators[0].pulse($2, $3); } catch (e) { } } },  
+ 18834637: ($0) => { Module.canvas.style.cursor = UTF8ToString($0); },  
+ 18834688: () => { if (document.pointerLockElement) return 1; },  
+ 18834735: () => { if (document.fullscreenElement) return 1; },  
+ 18834781: () => { return window.innerWidth; },  
+ 18834807: () => { return window.innerHeight; },  
+ 18834834: ($0, $1, $2, $3, $4) => { if (typeof window === 'undefined' || (window.AudioContext || window.webkitAudioContext) === undefined) { return 0; } if (typeof(window.miniaudio) === 'undefined') { window.miniaudio = { referenceCount: 0 }; window.miniaudio.device_type = {}; window.miniaudio.device_type.playback = $0; window.miniaudio.device_type.capture = $1; window.miniaudio.device_type.duplex = $2; window.miniaudio.device_state = {}; window.miniaudio.device_state.stopped = $3; window.miniaudio.device_state.started = $4; let miniaudio = window.miniaudio; miniaudio.devices = []; miniaudio.track_device = function(device) { for (var iDevice = 0; iDevice < miniaudio.devices.length; ++iDevice) { if (miniaudio.devices[iDevice] == null) { miniaudio.devices[iDevice] = device; return iDevice; } } miniaudio.devices.push(device); return miniaudio.devices.length - 1; }; miniaudio.untrack_device_by_index = function(deviceIndex) { miniaudio.devices[deviceIndex] = null; while (miniaudio.devices.length > 0) { if (miniaudio.devices[miniaudio.devices.length-1] == null) { miniaudio.devices.pop(); } else { break; } } }; miniaudio.untrack_device = function(device) { for (var iDevice = 0; iDevice < miniaudio.devices.length; ++iDevice) { if (miniaudio.devices[iDevice] == device) { return miniaudio.untrack_device_by_index(iDevice); } } }; miniaudio.get_device_by_index = function(deviceIndex) { return miniaudio.devices[deviceIndex]; }; miniaudio.unlock_event_types = (function(){ return ['touchend', 'click']; })(); miniaudio.unlock = function() { for(var i = 0; i < miniaudio.devices.length; ++i) { var device = miniaudio.devices[i]; if (device != null && device.webaudio != null && device.state === miniaudio.device_state.started) { device.webaudio.resume().then(() => { _ma_device__on_notification_unlocked(device.pDevice); }, (error) => {console.error("Failed to resume audiocontext", error); }); } } miniaudio.unlock_event_types.map(function(event_type) { document.removeEventListener(event_type, miniaudio.unlock, true); }); }; miniaudio.unlock_event_types.map(function(event_type) { document.addEventListener(event_type, miniaudio.unlock, true); }); } window.miniaudio.referenceCount += 1; return 1; },  
+ 18837012: () => { if (typeof(window.miniaudio) !== 'undefined') { window.miniaudio.unlock_event_types.map(function(event_type) { document.removeEventListener(event_type, window.miniaudio.unlock, true); }); window.miniaudio.referenceCount -= 1; if (window.miniaudio.referenceCount === 0) { delete window.miniaudio; } } },  
+ 18837316: () => { return (navigator.mediaDevices !== undefined && navigator.mediaDevices.getUserMedia !== undefined); },  
+ 18837420: () => { try { var temp = new (window.AudioContext || window.webkitAudioContext)(); var sampleRate = temp.sampleRate; temp.close(); return sampleRate; } catch(e) { return 0; } },  
+ 18837591: ($0, $1, $2, $3, $4, $5) => { var deviceType = $0; var channels = $1; var sampleRate = $2; var bufferSize = $3; var pIntermediaryBuffer = $4; var pDevice = $5; if (typeof(window.miniaudio) === 'undefined') { return -1; } var device = {}; var audioContextOptions = {}; if (deviceType == window.miniaudio.device_type.playback && sampleRate != 0) { audioContextOptions.sampleRate = sampleRate; } device.webaudio = new (window.AudioContext || window.webkitAudioContext)(audioContextOptions); device.webaudio.suspend(); device.state = window.miniaudio.device_state.stopped; var channelCountIn = 0; var channelCountOut = channels; if (deviceType != window.miniaudio.device_type.playback) { channelCountIn = channels; } device.scriptNode = device.webaudio.createScriptProcessor(bufferSize, channelCountIn, channelCountOut); device.scriptNode.onaudioprocess = function(e) { if (device.intermediaryBufferView == null || device.intermediaryBufferView.length == 0) { device.intermediaryBufferView = new Float32Array(HEAPF32.buffer, pIntermediaryBuffer, bufferSize * channels); } if (deviceType == window.miniaudio.device_type.capture || deviceType == window.miniaudio.device_type.duplex) { for (var iChannel = 0; iChannel < channels; iChannel += 1) { var inputBuffer = e.inputBuffer.getChannelData(iChannel); var intermediaryBuffer = device.intermediaryBufferView; for (var iFrame = 0; iFrame < bufferSize; iFrame += 1) { intermediaryBuffer[iFrame*channels + iChannel] = inputBuffer[iFrame]; } } _ma_device_process_pcm_frames_capture__webaudio(pDevice, bufferSize, pIntermediaryBuffer); } if (deviceType == window.miniaudio.device_type.playback || deviceType == window.miniaudio.device_type.duplex) { _ma_device_process_pcm_frames_playback__webaudio(pDevice, bufferSize, pIntermediaryBuffer); for (var iChannel = 0; iChannel < e.outputBuffer.numberOfChannels; ++iChannel) { var outputBuffer = e.outputBuffer.getChannelData(iChannel); var intermediaryBuffer = device.intermediaryBufferView; for (var iFrame = 0; iFrame < bufferSize; iFrame += 1) { outputBuffer[iFrame] = intermediaryBuffer[iFrame*channels + iChannel]; } } } else { for (var iChannel = 0; iChannel < e.outputBuffer.numberOfChannels; ++iChannel) { e.outputBuffer.getChannelData(iChannel).fill(0.0); } } }; if (deviceType == window.miniaudio.device_type.capture || deviceType == window.miniaudio.device_type.duplex) { navigator.mediaDevices.getUserMedia({audio:true, video:false}) .then(function(stream) { device.streamNode = device.webaudio.createMediaStreamSource(stream); device.streamNode.connect(device.scriptNode); device.scriptNode.connect(device.webaudio.destination); }) .catch(function(error) { console.log("Failed to get user media: " + error); }); } if (deviceType == window.miniaudio.device_type.playback) { device.scriptNode.connect(device.webaudio.destination); } device.pDevice = pDevice; return window.miniaudio.track_device(device); },  
+ 18840468: ($0) => { return window.miniaudio.get_device_by_index($0).webaudio.sampleRate; },  
+ 18840541: ($0) => { var device = window.miniaudio.get_device_by_index($0); if (device.scriptNode !== undefined) { device.scriptNode.onaudioprocess = function(e) {}; device.scriptNode.disconnect(); device.scriptNode = undefined; } if (device.streamNode !== undefined) { device.streamNode.disconnect(); device.streamNode = undefined; } device.webaudio.close(); device.webaudio = undefined; device.pDevice = undefined; },  
+ 18840941: ($0) => { window.miniaudio.untrack_device_by_index($0); },  
+ 18840991: ($0) => { var device = window.miniaudio.get_device_by_index($0); device.webaudio.resume(); device.state = window.miniaudio.device_state.started; },  
+ 18841130: ($0) => { var device = window.miniaudio.get_device_by_index($0); device.webaudio.suspend(); device.state = window.miniaudio.device_state.stopped; }
 };
 function SetCanvasIdJs(out,outSize) { var canvasId = "#" + Module.canvas.id; stringToUTF8(canvasId, out, outSize); }
 function __asyncjs__RequestClipboardData() { return Asyncify.handleAsync(async () => { if (navigator.clipboard && window.isSecureContext) { let items = await navigator.clipboard.read(); for (const item of items) { if (item.types.includes("text/plain")) { const blob = await item.getType("text/plain"); const text = await blob.text(); window._lastClipboardString = text; } else if (item.types.find(t => t.startsWith("image/"))) { const blob = await item.getType(item.types.find(t => t.startsWith("image/"))); const bitmap = await createImageBitmap(blob); const canvas = document.createElement('canvas'); canvas.width = bitmap.width; canvas.height = bitmap.height; const ctx = canvas.getContext('2d'); ctx.drawImage(bitmap, 0, 0); const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data; window._lastImgWidth = canvas.width; window._lastImgHeight = canvas.height; window._lastImgData = imgData; } } } else console.warn("Clipboard read() requires HTTPS/Localhost"); }); }
@@ -10243,6 +10253,11 @@ var _game_hot_reloaded = Module['_game_hot_reloaded'] = makeInvalidEarlyAccess('
 var _game_force_reload = Module['_game_force_reload'] = makeInvalidEarlyAccess('_game_force_reload');
 var _game_force_restart = Module['_game_force_restart'] = makeInvalidEarlyAccess('_game_force_restart');
 var _fflush = makeInvalidEarlyAccess('_fflush');
+var _ma_device__on_notification_unlocked = Module['_ma_device__on_notification_unlocked'] = makeInvalidEarlyAccess('_ma_device__on_notification_unlocked');
+var _ma_malloc_emscripten = Module['_ma_malloc_emscripten'] = makeInvalidEarlyAccess('_ma_malloc_emscripten');
+var _ma_free_emscripten = Module['_ma_free_emscripten'] = makeInvalidEarlyAccess('_ma_free_emscripten');
+var _ma_device_process_pcm_frames_capture__webaudio = Module['_ma_device_process_pcm_frames_capture__webaudio'] = makeInvalidEarlyAccess('_ma_device_process_pcm_frames_capture__webaudio');
+var _ma_device_process_pcm_frames_playback__webaudio = Module['_ma_device_process_pcm_frames_playback__webaudio'] = makeInvalidEarlyAccess('_ma_device_process_pcm_frames_playback__webaudio');
 var _emscripten_stack_get_end = makeInvalidEarlyAccess('_emscripten_stack_get_end');
 var _emscripten_stack_get_base = makeInvalidEarlyAccess('_emscripten_stack_get_base');
 var _strerror = makeInvalidEarlyAccess('_strerror');
@@ -10299,6 +10314,16 @@ function assignWasmExports(wasmExports) {
   _game_force_restart = Module['_game_force_restart'] = createExportWrapper('game_force_restart', 1);
   assert(typeof wasmExports['fflush'] != 'undefined', 'missing Wasm export: fflush');
   _fflush = createExportWrapper('fflush', 1);
+  assert(typeof wasmExports['ma_device__on_notification_unlocked'] != 'undefined', 'missing Wasm export: ma_device__on_notification_unlocked');
+  _ma_device__on_notification_unlocked = Module['_ma_device__on_notification_unlocked'] = createExportWrapper('ma_device__on_notification_unlocked', 1);
+  assert(typeof wasmExports['ma_malloc_emscripten'] != 'undefined', 'missing Wasm export: ma_malloc_emscripten');
+  _ma_malloc_emscripten = Module['_ma_malloc_emscripten'] = createExportWrapper('ma_malloc_emscripten', 2);
+  assert(typeof wasmExports['ma_free_emscripten'] != 'undefined', 'missing Wasm export: ma_free_emscripten');
+  _ma_free_emscripten = Module['_ma_free_emscripten'] = createExportWrapper('ma_free_emscripten', 2);
+  assert(typeof wasmExports['ma_device_process_pcm_frames_capture__webaudio'] != 'undefined', 'missing Wasm export: ma_device_process_pcm_frames_capture__webaudio');
+  _ma_device_process_pcm_frames_capture__webaudio = Module['_ma_device_process_pcm_frames_capture__webaudio'] = createExportWrapper('ma_device_process_pcm_frames_capture__webaudio', 3);
+  assert(typeof wasmExports['ma_device_process_pcm_frames_playback__webaudio'] != 'undefined', 'missing Wasm export: ma_device_process_pcm_frames_playback__webaudio');
+  _ma_device_process_pcm_frames_playback__webaudio = Module['_ma_device_process_pcm_frames_playback__webaudio'] = createExportWrapper('ma_device_process_pcm_frames_playback__webaudio', 3);
   assert(typeof wasmExports['emscripten_stack_get_end'] != 'undefined', 'missing Wasm export: emscripten_stack_get_end');
   _emscripten_stack_get_end = wasmExports['emscripten_stack_get_end'];
   assert(typeof wasmExports['emscripten_stack_get_base'] != 'undefined', 'missing Wasm export: emscripten_stack_get_base');
