@@ -1,6 +1,7 @@
 package game
 
 import "core:fmt"
+import "core:math/linalg"
 import "core:strings"
 import "core:unicode/utf8"
 import hm "handle_map_static"
@@ -16,6 +17,7 @@ BACKGROUND_MAP_COLOR :: rl.Color{128, 128, 128, 255}
 CAMERA_MAP_COLOR :: rl.Color{99, 155, 255, 255}
 LETTERS_PER_LINE :: 20
 LINES_PER_TABLET :: 15
+TABLET_STACK_FLOOR_TILE: TilemapTileId : {219, 188} //got this by measuring in world
 @(rodata)
 LEVELS := []Level {
 	{
@@ -128,7 +130,7 @@ GameSpecificGlobalState :: struct {
 	//where to spawn the player when the player object is spawned later
 	camera_spawn_point:   vec2,
 	camera_bounds:        Rect,
-	player_handle:        GameObjectHandle,
+	tablet_stack_bottom:  vec2,
 	color_to_tiletype:    map[rl.Color]TileType,
 	color_to_spawn:       map[rl.Color]SpawnType,
 }
@@ -279,7 +281,7 @@ reset_game :: proc(g: ^Game = game) {
 	recreate_final_transforms(g)
 	g.frame_counter = 0
 	g.screen_space_parent_handle = spawn_object(GameObject{name = "screen space parent"})
-	g.player_handle = {}
+	g.tablet_stack_bottom = get_tile_center(TABLET_STACK_FLOOR_TILE) - {0, TILE_SIZE / 2}
 }
 
 //game-specific update logic (run once per frame)
@@ -291,6 +293,18 @@ game_update :: proc(game: ^Game, dt: f64) {
 		game.stage = .Compressing
 	case .Compressing:
 		game.main_camera.position += 1000 * dt * WASD()
+		//do gravity
+		{it := hm.make_iter(&game.objects)
+			for it in all_objects_with_tags(&it, .Collide) {
+				GRAVITY_STRENGTH :: 9.8 * 10
+				it.acceleration += {0, GRAVITY_STRENGTH}
+			}
+		}
+		mouse_screen_pos := linalg.to_f64(rl.GetMousePosition())
+		mouse_pos := screen_to_world(linalg.to_f64(rl.GetMousePosition()), screen_conversion)
+		mouse_tile := get_containing_tile(mouse_pos)
+		print(mouse_pos, mouse_tile)
+
 	//update timer
 	//if time is up, end the level
 	//handle click & drag
@@ -418,21 +432,39 @@ string_to_message :: proc(s: string) -> Message {
 
 //called once at start of game
 //called at start of level
-spawn_tablets :: proc(level: Level, message: ^Message) -> []GameObjectHandle {
+spawn_tablets :: proc(level: Level, message: ^Message) {
 	//divide message into tablet-sized chunks
 	num_tablets := set_message_element_positions(message, LETTERS_PER_LINE, LINES_PER_TABLET)
 	//for each chunk, spawn tablet displaying that message
 	tablet_objects := [dynamic]GameObjectHandle{}
 	for i in 0 ..< num_tablets {
-		//TODO tablet size / derive tablet pos
-		append(&tablet_objects, spawn_tablet(game.camera_spawn_point, message))
+		tablet_height :: 1000
+		spawn_tablet(
+			game.tablet_stack_bottom - f64(num_tablets - i) * vec2{0, tablet_height},
+			message,
+			i,
+		)
 	}
-	return tablet_objects[:]
 }
 //called from spawn_tablets
-spawn_tablet :: proc(pos: vec2, message: ^Message) -> GameObjectHandle {
-	//TODO
-	return {}
+spawn_tablet :: proc(pos: vec2, message: ^Message, tablet_number: int) -> GameObjectHandle {
+	//shoot bullet
+	tex := atlas_textures[.Tablet100_Tablets]
+	tex_dims := vec2{tex.rect.width, tex.rect.height}
+	scale := vec2{0.5, 0.5}
+	tablet := GameObject {
+		name = fmt.aprint("tablet", tablet_number),
+		transform = {position = pos, scale = scale, pivot = {tex_dims.x / 2, tex_dims.y / 2}},
+		render_info = {
+			texture = tex,
+			color = rl.WHITE,
+			render_layer = uint(RenderLayer.Bullet),
+			keep_original_dimensions = true,
+		},
+		hitbox = {layer = .Default, shape = AABB{min = (-tex_dims / 2), max = tex_dims / 2}},
+		tags = {.Sprite, .Collide},
+	}
+	return spawn_object(tablet)
 }
 //called from spawn_tablet
 spawn_message_element_object :: proc(
@@ -441,7 +473,7 @@ spawn_message_element_object :: proc(
 ) -> GameObjectHandle {return {}}
 level_start :: proc(level: Level) {
 	message := string_to_message(level.target_message)
-	tablet_objects := spawn_tablets(level, &message)
+	spawn_tablets(level, &message)
 }
 level_end :: proc(level: Level) {}
 level_score :: proc(level: Level) {}
