@@ -25,19 +25,19 @@ SCREENSHAKE_DECAY :: 18
 @(rodata)
 LEVELS := []Level {
 	{
-		target_message = "Made for Ludum Dare 59 by Nathaniel Saxe and Ryan Kann. -------------------- -------------------- -------------------- -------------------- -------------------- -------------------- -------------------- -------------------- In a world where they never figured out paper, important messages are sent overseas on stone tablets like these. You are in charge of compressing longer messages until they can fit on a single boat, saving your shipping company millions each year. Speaking of which, this boat can only fit 3 stone tablets, so you'll have to figure out a way to make the message a bit smaller. Looks like the '--------------------' is repeated a bunch of times in a row on the first tablet, maybe you can use a number as a shorthand for many times that part of the message was repeated.",
+		target_message = "Made for Ludum Dare 59 by Nathaniel Saxe and Ryan Kann. -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ In a world where they never figured out paper, important messages are sent overseas on stone tablets like these. You are in charge of compressing longer messages until they can fit on a single boat, saving your shipping company millions each year. Speaking of which, this boat can only fit 3 stone tablets, so you'll have to figure out a way to make the message a bit smaller. Looks like '-_-_-_-_-_-_-_-_-_-_' is repeated a bunch of times in a row on the first tablet, maybe you can use a number as a shorthand for many times that part of the message was repeated.",
 		max_tablets = 3,
 		time_limit = 180,
 	},
 	{
-		target_message = "Made for Ludum Dare 59 by Nathaniel Saxe and Ryan Kann. -------------------- -------------------- -------------------- -------------------- -------------------- -------------------- -------------------- -------------------- Many copies of the same word in a row is unusual, though. We'll have to think of another trick. We've got all these pebbles lying around the warehouse. Maybe we can attach them to the tablet, along with instructions saying that whenever you see a white pebble, you should replace it with some long word. You can use an equals sign to say '(white pebble) = the' and then replace all the ' the ' in the message with white pebbles.",
+		target_message = "Made for Ludum Dare 59 by Nathaniel Saxe and Ryan Kann. -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ Many copies of the same word in a row is unusual, though. We'll have to think of another trick. We've got all these pebbles lying around the warehouse. Maybe we can attach them to the tablet, along with instructions saying that whenever you see a white pebble, you should replace it with a particular word. You can use an equals sign to say '(white pebble) = the' and then replace all the ' the ' in this message with white pebbles.",
 		max_tablets = 3,
-		time_limit = 180,
+		time_limit = 120,
 	},
 	{
-		target_message = "Made for Ludum Dare 59 by Nathaniel Saxe and Ryan Kann. -------------------- -------------------- -------------------- -------------------- -------------------- -------------------- -------------------- -------------------- Ok let's be real, the person on the other end of the message probably doesn't need to know exactly how many of those dashes there were. The message still *means* about the same thing regardless. See if it still works if you just remove them entirely, as long as the actual meaning of the message is preserved I'm sure it will be understood.",
+		target_message = "Made for Ludum Dare 59 by Nathaniel Saxe and Ryan Kann. -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ Ok let's be real, the person on the other end of the message probably doesn't need to know exactly how many of those dashes there were. The message still *means* about the same thing regardless. See if it still works if you just remove them entirely, as long as the actual meaning of the message is preserved I'm sure it will be understood.",
 		max_tablets = 2,
-		time_limit = 180,
+		time_limit = 120,
 	},
 }
 
