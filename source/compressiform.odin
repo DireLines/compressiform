@@ -301,7 +301,7 @@ game_update :: proc(game: ^Game, dt: f64) {
 		rl.PlaySound(get_sound("tablet-whoosh.wav"))
 		game.stage = .Compressing
 	case .Compressing:
-		if game.frame_counter % 3 == 0 {
+		if game.frame_counter % 2 == 0 {
 			game.screen_shake = random_point_in_circle({0, 0}, game.screen_shake_amt)
 		}
 		game.screen_shake_amt = max(0, game.screen_shake_amt - SCREENSHAKE_DECAY * dt)
