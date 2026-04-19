@@ -25,7 +25,7 @@ SCREENSHAKE_DECAY :: 18
 @(rodata)
 LEVELS := []Level {
 	{
-		target_message = "Made for Ludum Dare 59 by Nathaniel Saxe and Ryan Kann. -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ In a world where they never figured out paper, important messages are sent overseas on stone tablets like these. You are in charge of compressing longer messages until they can fit on a single boat, saving your shipping company millions each year. Speaking of which, this boat can only fit 3 stone tablets, so you'll have to figure out a way to make the message a bit smaller. Looks like '-_-_-_-_-_-_-_-_-_-_' is repeated a bunch of times in a row on the first tablet, maybe you can use a number as a shorthand for many times that part of the message was repeated.",
+		target_message = "Made for Ludum Dare 59 by Nathaniel Saxe and Ryan Kann. -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_ In a world where they never figured out paper, important messages are sent overseas on stone tablets like these. You are in charge of compressing longer messages until they can fit on a single boat, saving your shipping company millions each year. Speaking of which, this boat can only fit 3 stone tablets, so you'll have to figure out a way to make the message a bit smaller. Looks like '-_-_-_-_-_-_-_-_-_-_' is repeated a bunch of times in a row on the first tablet, maybe you can use a number as a shorthand for how many times that part of the message was repeated.",
 		max_tablets = 3,
 		time_limit = 180,
 	},
@@ -336,7 +336,7 @@ game_update :: proc(game: ^Game, dt: f64) {
 		mouse_pos := screen_to_world(linalg.to_f64(rl.GetMousePosition()), screen_conversion)
 		mouse_tile := get_containing_tile(mouse_pos)
 		{it := hm.make_iter(&game.objects)
-			for obj, h in all_objects_with_variant(&it, Tablet) {
+			for tablet, h in all_objects_with_variant(&it, Tablet) {
 				collisions := game.collisions[h]
 				for collision in collisions {
 					if collision.type != .start {continue}
@@ -347,6 +347,14 @@ game_update :: proc(game: ^Game, dt: f64) {
 						rl.PlaySound(get_sound("tablet-thud-1.wav"))
 						rl.PlaySound(get_sound("tablet-thud-2.wav"))
 						game.screen_shake_amt = TABLET_THUD_SCREENSHAKE_AMT
+						it_children := hm.make_iter(&game.objects)
+						//unparent children so they aren't in local coords anymore
+						for child in hm.iter(&it) {
+							if child.parent_handle != h {continue}
+							world_pos := local_to_world(h, child.position + tablet.pivot)
+							child.position = world_pos
+							child.parent_handle = nil
+						}
 					}
 				}
 			}
@@ -479,11 +487,15 @@ string_to_message :: proc(s: string) -> Message {
 	return result
 }
 
-get_grabbables_at_cursor :: proc(cursor_pos: vec2) -> []GameObjectHandle {
+get_draggables_at_cursor :: proc(cursor_pos: vec2) -> []GameObjectHandle {
 	return {}
 }
 
-release_grabbed_object :: proc() {
+drag_start :: proc() {
+
+}
+
+drag_stop :: proc() {
 
 }
 
