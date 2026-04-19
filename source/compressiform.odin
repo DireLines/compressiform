@@ -25,11 +25,20 @@ SCREENSHAKE_DECAY :: 18
 @(rodata)
 LEVELS := []Level {
 	{
-		target_message = "Made for Ludum Dare 2026 by Nathaniel Saxe and Ryan Kann. -------------------- -------------------- -------------------- -------------------- -------------------- -------------------- -------------------- -------------------- In a world where they never figured out paper, important messages are sent overseas on stone tablets like these. You are in charge of compressing longer messages until they can fit on a single boat, saving your shipping company millions each year.",
-		max_tablets = 1,
-		time_limit = 120,
+		target_message = "Made for Ludum Dare 59 by Nathaniel Saxe and Ryan Kann. -------------------- -------------------- -------------------- -------------------- -------------------- -------------------- -------------------- -------------------- In a world where they never figured out paper, important messages are sent overseas on stone tablets like these. You are in charge of compressing longer messages until they can fit on a single boat, saving your shipping company millions each year. Speaking of which, this boat can only fit 3 stone tablets, so you'll have to figure out a way to make the message a bit smaller. Looks like the '--------------------' is repeated a bunch of times in a row on the first tablet, maybe you can use a number as a shorthand for many times that part of the message was repeated.",
+		max_tablets = 3,
+		time_limit = 180,
 	},
-	{target_message = "Now let's try another trick", max_tablets = 1, time_limit = 180},
+	{
+		target_message = "Made for Ludum Dare 59 by Nathaniel Saxe and Ryan Kann. -------------------- -------------------- -------------------- -------------------- -------------------- -------------------- -------------------- -------------------- Many copies of the same word in a row is unusual, though. We'll have to think of another trick. We've got all these pebbles lying around the warehouse. Maybe we can attach them to the tablet, along with instructions saying that whenever you see a white pebble, you should replace it with some long word. You can use an equals sign to say '(white pebble) = the' and then replace all the ' the ' in the message with white pebbles.",
+		max_tablets = 3,
+		time_limit = 180,
+	},
+	{
+		target_message = "Made for Ludum Dare 59 by Nathaniel Saxe and Ryan Kann. -------------------- -------------------- -------------------- -------------------- -------------------- -------------------- -------------------- -------------------- Ok let's be real, the person on the other end of the message probably doesn't need to know exactly how many of those dashes there were. The message still *means* about the same thing regardless. See if it still works if you just remove them entirely, as long as the actual meaning of the message is preserved I'm sure it will be understood.",
+		max_tablets = 2,
+		time_limit = 180,
+	},
 }
 
 //object tags
@@ -470,6 +479,14 @@ string_to_message :: proc(s: string) -> Message {
 	return result
 }
 
+get_grabbables_at_cursor :: proc(cursor_pos: vec2) -> []GameObjectHandle {
+	return {}
+}
+
+release_grabbed_object :: proc() {
+
+}
+
 print_message :: proc(m: ^Message) {
 	for element in m {
 		print(
@@ -532,17 +549,12 @@ spawn_tablet :: proc(pos: vec2, message: ^Message, tablet_number: int) -> GameOb
 	}
 	return tablet_handle
 }
-//called from spawn_tablet
-spawn_message_element_object :: proc(
-	element: MessageElement,
-	tablet: GameObjectInst(Tablet),
-) -> GameObjectHandle {
+
+get_message_element_text :: proc(element: MessageElementContent) -> string {
 	text: string
-	letter_size: f64 = 1
-	switch content in element.content {
+	switch content in element {
 	case Word:
 		text = content.str
-		letter_size = content.letter_size
 	case Number:
 		text = fmt.aprint(content.number)
 	case Equals:
@@ -550,6 +562,15 @@ spawn_message_element_object :: proc(
 	case MessageObject:
 		text = ""
 	}
+	return text
+}
+//called from spawn_tablet
+spawn_message_element_object :: proc(
+	element: MessageElement,
+	tablet: GameObjectInst(Tablet),
+) -> GameObjectHandle {
+	text := get_message_element_text(element.content)
+	letter_size: f64 = 1 //TODO this probably won't end up being implemented
 	obj_def := GameObject {
 		name = text,
 		position = get_start_position_within_tablet(
@@ -557,6 +578,7 @@ spawn_message_element_object :: proc(
 			element.position,
 		),
 		scale = {1, 1},
+		pivot = {0, 0},
 		parent_handle = tablet.handle,
 		render_info = {
 			render_layer = uint(RenderLayer.Ceiling),
@@ -576,7 +598,7 @@ spawn_message_element_object :: proc(
 get_start_position_within_tablet :: proc(tablet_rect: Rect, elem: MessageElementPosition) -> vec2 {
 	line_width := tablet_rect.width * 0.8
 	line_height := (tablet_rect.height * 0.6) / LINES_PER_TABLET
-	top_corner_of_content := 0.1 * vec2{tablet_rect.width, tablet_rect.height} - {450, 300}
+	top_corner_of_content := 0.1 * vec2{tablet_rect.width, tablet_rect.height} - {475, 300}
 	return(
 		top_corner_of_content +
 		{line_width * (elem.pos / LETTERS_PER_LINE), line_height * f64(elem.line)} \

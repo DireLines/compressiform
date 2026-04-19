@@ -580,18 +580,14 @@ render :: proc() {
 	when #config(show_object_list, false) {{
 			FONT_SIZE :: 12
 			ROW_HEIGHT :: 16
-			if rl.IsKeyPressed(.LEFT_BRACKET) {
+			if rl.IsKeyDown(.LEFT_BRACKET) {
 				object_list_display_start_index = max(0, object_list_display_start_index - 1)
-				game.main_camera.position =
-					game.objects.items[object_list_display_start_index].position
 			}
-			if rl.IsKeyPressed(.RIGHT_BRACKET) {
+			if rl.IsKeyDown(.RIGHT_BRACKET) {
 				object_list_display_start_index = min(
 					int(game.objects.num_items),
 					object_list_display_start_index + 1,
 				)
-				game.main_camera.position =
-					game.objects.items[object_list_display_start_index].position
 			}
 			label_pos_x: i32 = 16
 			for i in object_list_display_start_index ..< object_list_display_start_index + 200 {
@@ -607,14 +603,7 @@ render :: proc() {
 				if i == 0 || item.handle.idx == 0 {
 					text = fmt.tprintf("%d", i)
 				} else {
-					text = fmt.tprintf(
-						"%d (gen %d) %s %v %v",
-						i,
-						item.handle.gen,
-						item.name,
-						item.position,
-						game.final_transforms[i],
-					)
+					text = fmt.tprintf("%d (gen %d) %s", i, item.handle.gen, item.name)
 				}
 				rl.DrawText(
 					strings.clone_to_cstring(text, context.temp_allocator),
