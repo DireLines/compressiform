@@ -3,7 +3,6 @@ package game
 import "core:fmt"
 import "core:math/linalg"
 import "core:strings"
-import "core:unicode/utf8"
 import hm "handle_map_static"
 import maps "mapgen"
 import rl "vendor:raylib"
@@ -15,8 +14,8 @@ UI_SECONDARY_FONT_SIZE :: 42
 IN_GAME_FONT_SIZE :: 36
 BACKGROUND_MAP_COLOR :: rl.Color{128, 128, 128, 255}
 CAMERA_MAP_COLOR :: rl.Color{99, 155, 255, 255}
-LETTERS_PER_LINE :: 20
-LINES_PER_TABLET :: 15
+LETTERS_PER_LINE :: 15
+LINES_PER_TABLET :: 10
 TABLET_STACK_FLOOR_TILE: TilemapTileId : {219, 188} //got this by measuring in world
 TABLET_THUD_SCREENSHAKE_AMT :: 20
 SCREENSHAKE_DECAY :: 18
@@ -54,7 +53,7 @@ ObjectTag :: enum {
 SpawnType :: enum {
 	None,
 	Camera,
-	Backglevel,
+	Background,
 }
 
 Level :: struct {
@@ -277,6 +276,7 @@ game_start :: proc(game: ^Game) {
 			render_layer = uint(RenderLayer.Bottom),
 		},
 	)
+	game.level_number = 1
 	game.stage = .Start
 }
 
@@ -339,7 +339,8 @@ game_update :: proc(game: ^Game, dt: f64) {
 	//handle click & drag
 	//on drag stop, update the level message
 	case .Scoring:
-	//progress through scoring animation
+		//progress through scoring animation
+		game.level_number += 1
 	case .GameOver:
 	//show new game button
 	}
@@ -443,20 +444,32 @@ set_message_element_positions :: proc(
 			line = 0
 			tablet += 1
 		}
-		element.position = {line, tablet, column - elem_len}
+		element.position = {tablet, line, column - elem_len}
 	}
 	return tablet + 1
 }
 //make message from string
 string_to_message :: proc(s: string) -> Message {
 	result := Message{}
-	for c in s {
-		append(
-			&result,
-			MessageElement{content = Word{str = utf8.runes_to_string({c}), letter_size = 1}},
-		)
+	words := strings.split_multi(s, {" ", ",", "."})
+	for word in words {
+		append(&result, MessageElement{content = Word{str = word, letter_size = 1}})
 	}
 	return result
+}
+
+print_message :: proc(m: ^Message) {
+	for element in m {
+		print(
+			element.content,
+			"is at position",
+			element.pos,
+			"on line",
+			element.line,
+			"on tablet",
+			element.tablet,
+		)
+	}
 }
 
 //called once at start of game
@@ -464,6 +477,7 @@ string_to_message :: proc(s: string) -> Message {
 spawn_tablets :: proc(level: Level, message: ^Message) {
 	//divide message into tablet-sized chunks
 	num_tablets := set_message_element_positions(message, LETTERS_PER_LINE, LINES_PER_TABLET)
+	print_message(message)
 	//for each chunk, spawn tablet displaying that message
 	tablet_objects := [dynamic]GameObjectHandle{}
 	for i in 0 ..< num_tablets {
@@ -495,13 +509,19 @@ spawn_tablet :: proc(pos: vec2, message: ^Message, tablet_number: int) -> GameOb
 		tags = {.Sprite, .Collide},
 		variant = Tablet{},
 	}
-	return spawn_object(tablet)
+	tablet_handle := spawn_object(tablet)
+	for element in message {
+		if element.tablet != tablet_number {continue}
+		spawn_message_element_object(element, tablet_handle)
+	}
+	return tablet_handle
 }
 //called from spawn_tablet
 spawn_message_element_object :: proc(
-	pos: vec2,
 	element: MessageElement,
+	parent: GameObjectHandle,
 ) -> GameObjectHandle {return {}}
+
 level_start :: proc(level: Level) {
 	message := string_to_message(level.target_message)
 	spawn_tablets(level, &message)
