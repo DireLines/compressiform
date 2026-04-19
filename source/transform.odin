@@ -16,10 +16,17 @@ screen_conversion :: ScreenConversion {
 	f64(WINDOW_HEIGHT),
 }
 world_to_screen :: proc(w: vec2, cv: ScreenConversion) -> vec2 {
-	return cv.scale * (w - game.main_camera.position) + 0.5 * {cv.screen_width, cv.screen_height}
+	return(
+		cv.scale * (w - game.main_camera.position - game.screen_shake) +
+		0.5 * {cv.screen_width, cv.screen_height} \
+	)
 }
 screen_to_world :: proc(s: vec2, cv: ScreenConversion) -> vec2 {
-	return (s - 0.5 * {cv.screen_width, cv.screen_height}) / cv.scale + game.main_camera.position
+	return(
+		(s - 0.5 * {cv.screen_width, cv.screen_height}) / cv.scale +
+		game.main_camera.position +
+		game.screen_shake \
+	)
 }
 
 //assumes game.final_transforms is up to date

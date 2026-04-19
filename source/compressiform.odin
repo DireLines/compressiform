@@ -18,6 +18,8 @@ CAMERA_MAP_COLOR :: rl.Color{99, 155, 255, 255}
 LETTERS_PER_LINE :: 20
 LINES_PER_TABLET :: 15
 TABLET_STACK_FLOOR_TILE: TilemapTileId : {219, 188} //got this by measuring in world
+TABLET_THUD_SCREENSHAKE_AMT :: 20
+SCREENSHAKE_DECAY :: 18
 @(rodata)
 LEVELS := []Level {
 	{
@@ -130,10 +132,13 @@ GameSpecificGlobalState :: struct {
 	//where to spawn the player when the player object is spawned later
 	camera_spawn_point:   vec2,
 	camera_bounds:        Rect,
+	screen_shake_amt:     f64,
+	screen_shake:         vec2,
 	tablet_stack_bottom:  vec2,
 	color_to_tiletype:    map[rl.Color]TileType,
 	color_to_spawn:       map[rl.Color]SpawnType,
 }
+
 
 //object variants
 //in contrast to tags, each object has exactly one variant
@@ -153,8 +158,10 @@ UIButton :: struct {
 	on_click_start:       proc(info: ButtonCallbackInfo) `cbor:"-"`, //triggered when mouse button down and hovering button
 	on_click:             proc(info: ButtonCallbackInfo) `cbor:"-"`, //triggered when mouse button up and hovering button - most of the time this is what you want
 }
+Tablet :: struct {}
 GameObjectVariant :: union {
 	DefaultVariant,
+	Tablet,
 	UIButton,
 }
 
@@ -286,23 +293,45 @@ reset_game :: proc(g: ^Game = game) {
 
 //game-specific update logic (run once per frame)
 game_update :: proc(game: ^Game, dt: f64) {
+	timer := timer()
 	switch game.stage {
 	case .Start:
 		game.level = LEVELS[game.level_number]
 		level_start(game.level)
+		rl.PlaySound(get_sound("tablet-whoosh.wav"))
 		game.stage = .Compressing
 	case .Compressing:
+		if game.frame_counter % 3 == 0 {
+			game.screen_shake = random_point_in_circle({0, 0}, game.screen_shake_amt)
+		}
+		game.screen_shake_amt = max(0, game.screen_shake_amt - SCREENSHAKE_DECAY * dt)
 		game.main_camera.position += 1000 * dt * WASD()
 		//do gravity
 		{it := hm.make_iter(&game.objects)
-			for it in all_objects_with_tags(&it, .Collide) {
-				GRAVITY_STRENGTH :: 980
-				it.acceleration += {0, GRAVITY_STRENGTH}
+			for obj in all_objects_with_tags(&it, .Collide) {
+				GRAVITY_STRENGTH :: 800
+				obj.acceleration.y += GRAVITY_STRENGTH
 			}
 		}
 		mouse_screen_pos := linalg.to_f64(rl.GetMousePosition())
 		mouse_pos := screen_to_world(linalg.to_f64(rl.GetMousePosition()), screen_conversion)
 		mouse_tile := get_containing_tile(mouse_pos)
+		{it := hm.make_iter(&game.objects)
+			for obj, h in all_objects_with_variant(&it, Tablet) {
+				collisions := game.collisions[h]
+				for collision in collisions {
+					if collision.type != .start {continue}
+					switch other in collision.b {
+					case GameObjectHandle: //don't care
+					case TilemapTileId:
+						//hit the ground
+						rl.PlaySound(get_sound("tablet-thud-1.wav"))
+						rl.PlaySound(get_sound("tablet-thud-2.wav"))
+						game.screen_shake_amt = TABLET_THUD_SCREENSHAKE_AMT
+					}
+				}
+			}
+		}
 	// print(mouse_pos, mouse_tile)
 
 	//update timer
@@ -438,7 +467,7 @@ spawn_tablets :: proc(level: Level, message: ^Message) {
 	//for each chunk, spawn tablet displaying that message
 	tablet_objects := [dynamic]GameObjectHandle{}
 	for i in 0 ..< num_tablets {
-		tablet_height :: 1000
+		tablet_height :: 1500
 		spawn_tablet(
 			game.tablet_stack_bottom - f64(num_tablets - i) * vec2{0, tablet_height},
 			message,
@@ -464,6 +493,7 @@ spawn_tablet :: proc(pos: vec2, message: ^Message, tablet_number: int) -> GameOb
 		velocity = {0, 100}, //throw it down
 		hitbox = {layer = .Default, shape = AABB{min = (-tex_dims / 2), max = tex_dims / 2}},
 		tags = {.Sprite, .Collide},
+		variant = Tablet{},
 	}
 	return spawn_object(tablet)
 }
