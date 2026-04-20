@@ -20,3 +20,5 @@ palette_tool
 
 .vscode/launch.json
 
+scripts/.cache/
+
