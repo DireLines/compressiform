@@ -1,5 +1,5 @@
 MAIN_DIR = source/main_release
-ODIN_ROOT := $(shell odin root)
+ODIN_ROOT := $(subst \,/,$(shell odin root))
 
 ifeq ($(OS),Windows_NT)
 	EXE = game.exe
@@ -20,7 +20,7 @@ endif
 
 HOT_RELOAD_DIR = build/hot_reload
 WEB_DIR = build/web
-EMSCRIPTEN_SDK_DIR ?= $(HOME)/repos/emsdk
+EMSCRIPTEN_SDK_DIR ?= $(or $(EMSDK),$(shell which emcc > /dev/null 2>&1 && dirname $$(dirname $$(which emcc))))
 
 help: #show this help
 	@grep -E '^[a-zA-Z_-]+:.*#' $(MAKEFILE_LIST) | \
@@ -80,24 +80,31 @@ hot-reload-run: hot-reload #build and run the hot reload game
 
 web: #build for web using emscripten
 	@mkdir -p $(WEB_DIR)
-	@export EMSDK_QUIET=1; \
-	[ -f "$(EMSCRIPTEN_SDK_DIR)/emsdk_env.sh" ] && . "$(EMSCRIPTEN_SDK_DIR)/emsdk_env.sh"; \
+	@if [ -z "$(EMSCRIPTEN_SDK_DIR)" ]; then \
+		echo "Error: Cannot find Emscripten SDK. Either:"; \
+		echo "  1. Source emsdk_env.sh before running make, or"; \
+		echo "  2. Pass EMSCRIPTEN_SDK_DIR: make web EMSCRIPTEN_SDK_DIR=/path/to/emsdk"; \
+		exit 1; \
+	fi
 	odin build source/main_web -o:speed -target:js_wasm32 -build-mode:obj \
 		-define:glsl_version="300 es" \
 		-define:RAYLIB_WASM_LIB=env.o -define:RAYGUI_WASM_LIB=env.o \
 		-define:show_fps=false \
-		-strict-style -out:$(WEB_DIR)/game.wasm.o; \
-	cp $(ODIN_ROOT)/core/sys/wasm/js/odin.js $(WEB_DIR); \
-	emcc -g -o $(WEB_DIR)/index.html \
+		-strict-style -out:$(WEB_DIR)/game.wasm.o
+	cp $(ODIN_ROOT)/core/sys/wasm/js/odin.js $(WEB_DIR)
+	python "$(EMSCRIPTEN_SDK_DIR)/upstream/emscripten/emcc.py" -g -o $(WEB_DIR)/index.html \
 		$(WEB_DIR)/game.wasm.o \
 		$(ODIN_ROOT)/vendor/raylib/wasm/libraylib.a \
 		$(ODIN_ROOT)/vendor/raylib/wasm/libraygui.a \
 		-sUSE_GLFW=3 -sWASM_BIGINT -sWARN_ON_UNDEFINED_SYMBOLS=0 -sASSERTIONS \
 		-sINITIAL_HEAP=2147483648 '-sEXPORTED_RUNTIME_METHODS=["HEAPF32"]' \
 		-sMAX_WEBGL_VERSION=2 \
-		--shell-file source/main_web/index_template.html; \
-	rm $(WEB_DIR)/game.wasm.o; \
-	echo "Web build created in $(WEB_DIR)"
+		--shell-file source/main_web/index_template.html
+	rm $(WEB_DIR)/game.wasm.o
+	@echo "Web build created in $(WEB_DIR)"
+
+web-serve: web #build for web and serve locally at http://localhost:8080
+	python -m http.server 8080 -d $(WEB_DIR)
 
 deploy: #deploy build/web to GitHub Pages (gh-pages branch)
 	@if [ ! -f "$(WEB_DIR)/index.html" ]; then echo "Error: $(WEB_DIR)/index.html not found. Run 'make web' first."; exit 1; fi
@@ -119,7 +126,7 @@ palette: #open the atlas palette viewer (zoomable/pannable, hover to inspect, cl
 	odin run tools/palette_tool
 
 .PHONY: help run speed release debug mem perf compile-perf atlas palette \
-       hot-reload hot-reload-libs hot-reload-dll hot-reload-exe hot-reload-run web \
+       hot-reload hot-reload-libs hot-reload-dll hot-reload-exe hot-reload-run web web-serve \
        deploy web-deploy
 
 .DEFAULT_GOAL := run

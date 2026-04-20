@@ -250,6 +250,44 @@ GameStage :: enum {
 //game-specific initialization logic (run once when game is started)
 //typically this will be "set up the main menu"
 game_start :: proc(game: ^Game) {
+	// NLP smoke test — remove after verifying
+	print("=== NLP similarity tests ===")
+	print("identical:", compute_similarity("hello world", "hello world"))
+	print("subset:", compute_similarity("the quick brown fox jumps", "quick fox"))
+	print("no overlap:", compute_similarity("hello world", "goodbye moon"))
+	print("case insensitive:", compute_similarity("Hello World", "hello world"))
+	print("empty vs text:", compute_similarity("", "hello"))
+	print("reordered:", compute_similarity("stone tablet message", "message stone tablet"))
+	print("--- tricky cases ---")
+	print("synonym (big/large):", compute_similarity("the big house", "the large house"))
+	print("synonym (fast/quick):", compute_similarity("the fast runner", "the quick runner"))
+	print("abbreviation:", compute_similarity("compressing messages on tablets", "compress msgs on tabs"))
+	print("dropped filler:", compute_similarity("I am going to the store to buy some food", "going store buy food"))
+	print("paraphrase:", compute_similarity("the cat sat on the mat", "a feline rested on the rug"))
+	print("repetition padding:", compute_similarity("hello", "hello hello hello hello"))
+	print("actual level msg:", compute_similarity(
+		"In a world where they never figured out paper, important messages are still sent overseas on stone tablets",
+		"important messages sent overseas on stone tablets",
+	))
+	print("--- hard paraphrases ---")
+	print("clothing/boutique:", compute_similarity(
+		"Sally went to the clothing store.",
+		"Sally popped on over to the boutique.",
+	))
+	print("negation:", compute_similarity(
+		"I love this movie",
+		"I hate this movie",
+	))
+	print("passive voice:", compute_similarity(
+		"The dog chased the cat",
+		"The cat was chased by the dog",
+	))
+	print("totally unrelated:", compute_similarity(
+		"The stock market crashed yesterday",
+		"She baked a chocolate cake",
+	))
+	print("============================")
+
 	game.color_to_tiletype[rl.BLACK] = .Wall
 	game.color_to_tiletype[STACK_START_COLOR] = .Wall
 	game.color_to_tiletype[BACKGROUND_MAP_COLOR] = .None
@@ -664,7 +702,10 @@ level_start :: proc(level: Level) {
 	spawn_tablets(level, &message)
 }
 level_end :: proc(level: Level) {}
-level_score :: proc(level: Level) {}
+level_score :: proc(level: Level) -> f64 {
+	compressed := message_to_string(game.message)
+	return compute_similarity(level.target_message, compressed)
+}
 // end_current_level :: proc() {}
 get_axis :: proc(key_neg, key_pos: rl.KeyboardKey) -> f64 {
 	return f64(int(rl.IsKeyDown(key_pos))) - f64(int(rl.IsKeyDown(key_neg)))
