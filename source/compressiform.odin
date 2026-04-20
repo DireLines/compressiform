@@ -759,7 +759,7 @@ spawn_tablet :: proc(pos: vec2, message: ^Message, tablet_number: int) -> GameOb
 		hitbox_offset := vec2{0, size.y / 2}
 		obj_def := GameObject {
 			name = text,
-			position = tablet_to_world(tablet, element.position),
+			position = tablet_to_local(tablet, element.position),
 			scale = {1, 1},
 			pivot = {0, 0},
 			parent_handle = tablet.handle,
