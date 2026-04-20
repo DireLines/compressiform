@@ -105,19 +105,19 @@ MessageObject :: distinct struct {
 	type:                MessageObjectType,
 	get_message_content: proc() -> string,
 }
-MessageElementContent :: union {
+MessageContent :: union {
 	Word,
 	Number,
 	Equals,
 	MessageObject,
 }
-MessageElementPosition :: struct {
+TabletPosition :: struct {
 	tablet, line: int,
-	pos:          f64,
+	col:          f64,
 }
 MessageElement :: struct {
-	content:        MessageElementContent,
-	using position: MessageElementPosition,
+	content:        MessageContent,
+	using position: TabletPosition,
 }
 Message :: [dynamic]MessageElement
 
@@ -392,7 +392,7 @@ game_update :: proc(game: ^Game, dt: f64) {
 		game.main_camera.position += 1000 * dt * camera_dir
 		clamp_camera_to_bounds(&game.main_camera.position, game.camera_bounds)
 		//do gravity
-		{it := hm.make_iter(&game.objects)
+		{it := object_iter()
 			for obj in all_objects_with_tags(&it, .Fall) {
 				GRAVITY_STRENGTH :: 800
 				obj.acceleration.y += GRAVITY_STRENGTH
@@ -413,7 +413,7 @@ game_update :: proc(game: ^Game, dt: f64) {
 				drag_start(draggable_objects[0])
 			}
 		}
-		{it := hm.make_iter(&game.objects)
+		{it := object_iter()
 			for tablet, h in all_objects_with_variant(&it, Tablet) {
 				collisions := game.collisions[h]
 				for collision in collisions {
@@ -425,7 +425,7 @@ game_update :: proc(game: ^Game, dt: f64) {
 						rl.PlaySound(get_sound("tablet-thud-1.wav"))
 						rl.PlaySound(get_sound("tablet-thud-2.wav"))
 						game.screen_shake_amt = TABLET_THUD_SCREENSHAKE_AMT
-						it_children := hm.make_iter(&game.objects)
+						it_children := object_iter()
 						//unparent children so they aren't in local coords anymore
 						for child in hm.iter(&it) {
 							if child.parent_handle != h {continue}
@@ -569,7 +569,7 @@ message_to_string :: proc(message: Message) -> string {
 	return result
 }
 
-get_message_element_text :: proc(element: MessageElementContent) -> string {
+get_message_element_text :: proc(element: MessageContent) -> string {
 	text: string
 	switch content in element {
 	case Word:
@@ -584,7 +584,7 @@ get_message_element_text :: proc(element: MessageElementContent) -> string {
 	return text
 }
 
-get_message_element_size :: proc(element: MessageElementContent) -> vec2 {
+get_message_element_size :: proc(element: MessageContent) -> vec2 {
 	text := get_message_element_text(element)
 	letter_size: f64 = 1 //TODO this probably won't end up being implemented
 	font_size := f32(letter_size * IN_GAME_FONT_SIZE)
@@ -610,15 +610,10 @@ set_message_element_positions :: proc(
 	tablet := 0
 	line := 0
 	column: f64 = 0
-	sum_ratios: f64 = 0
-	num_ratios: f64 = 0
 	for &element in message {
 		elem_size := get_message_element_size(element.content)
 		elem_len := elem_size.x
 		elem_len_with_space := elem_len + WORD_SPACING_PIXELS
-		text := get_message_element_text(element.content)
-		sum_ratios += elem_len / f64(len(text))
-		num_ratios += 1
 		column += elem_len_with_space
 		//fix run off end of line
 		if column - WORD_SPACING_PIXELS > f64(letters_per_line) * AVG_PIXELS_PER_LETTER {
@@ -632,7 +627,6 @@ set_message_element_positions :: proc(
 		}
 		element.position = {tablet, line, column - elem_len_with_space}
 	}
-	print("alskjdasd", sum_ratios / num_ratios)
 	return tablet + 1
 }
 //make message from string
@@ -649,7 +643,7 @@ string_to_message :: proc(s: string) -> Message {
 
 get_draggables_at_cursor :: proc(cursor_pos: vec2) -> []GameObjectHandle {
 	result := [dynamic]GameObjectHandle{}
-	it := hm.make_iter(&game.objects)
+	it := object_iter()
 	for obj, h in all_objects_with_tags(&it, .Draggable) {
 		world_box := get_bounding_box_for_moving_shape(
 			get_moving_hitbox_for_object(obj, game.final_transforms[h.idx].transform, 0).moving_shape,
@@ -679,7 +673,7 @@ drag_stop :: proc() {
 
 
 	get_containing_tablet :: proc(world_pos: vec2) -> Maybe(GameObjectInst(Tablet)) {
-		it := hm.make_iter(&game.objects)
+		it := object_iter()
 		for obj, h in all_objects_with_variant(&it, Tablet) {
 			world_box := get_bounding_box_for_moving_shape(
 				get_moving_hitbox_for_object(obj, game.final_transforms[h.idx].transform, 0).moving_shape,
@@ -697,7 +691,7 @@ print_message :: proc(m: ^Message) {
 		print(
 			element.content,
 			"is at position",
-			element.pos,
+			element.col,
 			"on line",
 			element.line,
 			"on tablet",
@@ -787,34 +781,28 @@ spawn_tablet :: proc(pos: vec2, message: ^Message, tablet_number: int) -> GameOb
 }
 
 
-tablet_to_local :: proc(tablet: GameObjectInst(Tablet), elem: MessageElementPosition) -> vec2 {
+tablet_to_local :: proc(tablet: GameObjectInst(Tablet), elem: TabletPosition) -> vec2 {
 	tablet_rect := aabb_to_rect(tablet.hitbox.shape.(AABB))
 	line_width := tablet_rect.width * 0.8
 	line_height := (tablet_rect.height * 0.6) / LINES_PER_TABLET
 	top_corner_of_content := 0.1 * vec2{tablet_rect.width, tablet_rect.height} - {475, 300}
-	return top_corner_of_content + {elem.pos, line_height * f64(elem.line)}
+	return top_corner_of_content + {elem.col, line_height * f64(elem.line)}
 }
-tablet_to_world :: proc(tablet: GameObjectInst(Tablet), elem: MessageElementPosition) -> vec2 {
+tablet_to_world :: proc(tablet: GameObjectInst(Tablet), elem: TabletPosition) -> vec2 {
 	return local_to_world(tablet.handle, tablet_to_local(tablet, elem))
 }
 
-local_to_tablet :: proc(
-	tablet: GameObjectInst(Tablet),
-	local_pos: vec2,
-) -> MessageElementPosition {
+local_to_tablet :: proc(tablet: GameObjectInst(Tablet), local_pos: vec2) -> TabletPosition {
 	tablet_rect := aabb_to_rect(tablet.hitbox.shape.(AABB))
-	line_width := tablet_rect.width * 0.8
 	line_height := (tablet_rect.height * 0.6) / LINES_PER_TABLET
 	top_corner_of_content := 0.1 * vec2{tablet_rect.width, tablet_rect.height} - {475, 300}
-	pos := local_pos.x - top_corner_of_content.x
-	line := math.round((local_pos.y))
-	return {}
+	diff := local_pos - top_corner_of_content
+	col := diff.x
+	line := int(math.round((diff.y / line_height)))
+	return TabletPosition{tablet = tablet.index_within_message, line = line, col = col}
 }
 
-world_to_tablet :: proc(
-	tablet: GameObjectInst(Tablet),
-	world_pos: vec2,
-) -> MessageElementPosition {
+world_to_tablet :: proc(tablet: GameObjectInst(Tablet), world_pos: vec2) -> TabletPosition {
 	return local_to_tablet(tablet, world_to_local(tablet.handle, world_pos))
 }
 
@@ -866,7 +854,7 @@ spawn_button :: proc(
 
 handle_ui_buttons :: proc() {
 	mouse_screen_pos := linalg.to_f64(rl.GetMousePosition())
-	it := hm.make_iter(&game.objects)
+	it := object_iter()
 	for button, button_handle in all_objects_with_variant(&it, UIButton) {
 		if game.clicked_ui_object != nil && game.clicked_ui_object != button_handle {continue}
 		screen_aabb := get_texture_aabb_for_object(

@@ -54,6 +54,20 @@ get_object :: proc {
 	get_object_from_handle_untyped,
 }
 
+object_iter :: proc() -> GameObjectsIterator {
+	return hm.make_iter(&game.objects)
+}
+
+all_objects :: proc(
+	it: ^GameObjectsIterator,
+) -> (
+	val: ^GameObject,
+	h: GameObjectHandle,
+	has_next: bool,
+) {
+	return hm.iter(it)
+}
+
 all_objects_with_tags :: proc(
 	it: ^GameObjectsIterator,
 	tags: ..ObjectTag,
