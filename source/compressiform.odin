@@ -387,10 +387,21 @@ game_update :: proc(game: ^Game, dt: f64) {
 			game.screen_shake = random_point_in_circle({0, 0}, game.screen_shake_amt)
 		}
 		game.screen_shake_amt = max(0, game.screen_shake_amt - SCREENSHAKE_DECAY * dt)
+
 		camera_dir := vec2{0, 0}
 		when EDGE_SCROLL_ENABLED {camera_dir += edge_scroll()}
 		game.main_camera.position += 1000 * dt * camera_dir
 		clamp_camera_to_bounds(&game.main_camera.position, game.camera_bounds)
+
+		//do gravity
+		{it := object_iter()
+			for obj in all_objects_with_tags(&it, .Fall) {
+				GRAVITY_STRENGTH :: 800
+				obj.acceleration.y += GRAVITY_STRENGTH
+			}
+		}
+
+
 		tablet, over_tablet := get_containing_tablet(game.mouse_world_pos).?
 		if over_tablet {
 			tablet_rect := aabb_to_rect(tablet.hitbox.shape.(AABB))
@@ -401,13 +412,7 @@ game_update :: proc(game: ^Game, dt: f64) {
 				tablet_to_world(tablet, world_to_tablet(tablet, game.mouse_world_pos)),
 			)
 		}
-		//do gravity
-		{it := object_iter()
-			for obj in all_objects_with_tags(&it, .Fall) {
-				GRAVITY_STRENGTH :: 800
-				obj.acceleration.y += GRAVITY_STRENGTH
-			}
-		}
+
 		dragged, dragging := game.dragged_object.?
 		if dragging {
 			dragged_obj := get_object(dragged)
@@ -423,6 +428,7 @@ game_update :: proc(game: ^Game, dt: f64) {
 				drag_start(draggable_objects[0])
 			}
 		}
+
 		{it := object_iter()
 			for tablet, h in all_objects_with_variant(&it, Tablet) {
 				collisions := game.collisions[h]
@@ -448,6 +454,7 @@ game_update :: proc(game: ^Game, dt: f64) {
 				}
 			}
 		}
+
 	// print(mouse_pos, mouse_tile)
 
 	//update timer
@@ -810,7 +817,8 @@ tablet_to_world :: proc(tablet: GameObjectInst(Tablet), elem: TabletPosition) ->
 local_to_tablet :: proc(tablet: GameObjectInst(Tablet), local_pos: vec2) -> TabletPosition {
 	tablet_rect := aabb_to_rect(tablet.hitbox.shape.(AABB))
 	line_height := (tablet_rect.height * 0.6) / LINES_PER_TABLET
-	top_corner_of_content := 0.1 * vec2{tablet_rect.width, tablet_rect.height} - {475, 300}
+	top_corner_of_content :=
+		0.1 * vec2{tablet_rect.width, tablet_rect.height} - {475, 300} + tablet.pivot
 	diff := local_pos - top_corner_of_content
 	col := diff.x
 	line := int(math.round((diff.y / line_height)))
