@@ -14,6 +14,10 @@ UI_SECONDARY_FONT_SIZE :: 42
 IN_GAME_FONT_SIZE :: 50
 BACKGROUND_MAP_COLOR :: rl.Color{128, 128, 128, 255}
 CAMERA_MAP_COLOR :: rl.Color{99, 155, 255, 255}
+EDGE_SCROLL_MARGIN :: 50 // pixels from window edge that triggers scrolling
+CAMERA_BOUNDS_PADDING :: vec2{TILE_SIZE * 1.5, TILE_SIZE * 0.5} // extra world-space margin so walls stay visible
+EDGE_SCROLL_ENABLED :: true
+WASD_ENABLED :: true
 STACK_START_COLOR :: rl.Color{255, 195, 59, 255}
 SLATE_GRAY :: rl.Color{210, 210, 220, 255}
 MENU_SCREEN_DIMS :: vec2{WINDOW_WIDTH, WINDOW_HEIGHT}
@@ -316,6 +320,7 @@ game_start :: proc(game: ^Game) {
 	game.camera_spawn_point = get_tile_center(cam_spawn_tile)
 	game.tablet_stack_bottom = get_tile_center(stack_start_tile) - {0, TILE_SIZE / 2}
 	game.main_camera.position = game.camera_spawn_point
+	game.camera_bounds = compute_camera_bounds(game.global_tilemap)
 	//TODO spawn background
 	spawn_object(
 		{
@@ -362,7 +367,11 @@ game_update :: proc(game: ^Game, dt: f64) {
 			game.screen_shake = random_point_in_circle({0, 0}, game.screen_shake_amt)
 		}
 		game.screen_shake_amt = max(0, game.screen_shake_amt - SCREENSHAKE_DECAY * dt)
-		game.main_camera.position += 1000 * dt * WASD()
+		camera_dir := vec2{0, 0}
+		when WASD_ENABLED { camera_dir += WASD() }
+		when EDGE_SCROLL_ENABLED { camera_dir += edge_scroll() }
+		game.main_camera.position += 1000 * dt * camera_dir
+		clamp_camera_to_bounds(&game.main_camera.position, game.camera_bounds)
 		//do gravity
 		{it := hm.make_iter(&game.objects)
 			for obj in all_objects_with_tags(&it, .Fall) {
@@ -712,6 +721,46 @@ get_axis :: proc(key_neg, key_pos: rl.KeyboardKey) -> f64 {
 }
 WASD :: proc() -> vec2 {
 	return {get_axis(.A, .D), get_axis(.W, .S)}
+}
+edge_scroll :: proc() -> vec2 {
+	mouse := linalg.to_f64(rl.GetMousePosition())
+	screen := vec2{f64(rl.GetScreenWidth()), f64(rl.GetScreenHeight())}
+	dir := vec2{0, 0}
+	if mouse.x < EDGE_SCROLL_MARGIN { dir.x = -1 }
+	if mouse.x > screen.x - EDGE_SCROLL_MARGIN { dir.x = 1 }
+	if mouse.y < EDGE_SCROLL_MARGIN { dir.y = -1 }
+	if mouse.y > screen.y - EDGE_SCROLL_MARGIN { dir.y = 1 }
+	return dir
+}
+compute_camera_bounds :: proc(tilemap: Tilemap) -> Rect {
+	min_x, min_y := max(int), max(int)
+	max_x, max_y := min(int), min(int)
+	for r in 0 ..< len(tilemap) {
+		for c in 0 ..< len(tilemap[r]) {
+			if tilemap[r][c].type != .Wall {
+				min_x = min(min_x, r)
+				min_y = min(min_y, c)
+				max_x = max(max_x, r)
+				max_y = max(max_y, c)
+			}
+		}
+	}
+	return {
+		x = f64(min_x) * TILE_SIZE,
+		y = f64(min_y) * TILE_SIZE,
+		width = f64(max_x - min_x + 1) * TILE_SIZE,
+		height = f64(max_y - min_y + 1) * TILE_SIZE,
+	}
+}
+clamp_camera_to_bounds :: proc(cam_pos: ^vec2, bounds: Rect) {
+	half_screen := vec2{f64(rl.GetScreenWidth()), f64(rl.GetScreenHeight())} / 2
+	cam_min := vec2{bounds.x, bounds.y} + half_screen - CAMERA_BOUNDS_PADDING
+	cam_max := vec2{bounds.x + bounds.width, bounds.y + bounds.height} - half_screen + CAMERA_BOUNDS_PADDING
+	// if bounds are smaller than screen, center the camera
+	if cam_min.x > cam_max.x { cam_pos.x = (cam_min.x + cam_max.x) / 2 }
+	else { cam_pos.x = clamp(cam_pos.x, cam_min.x, cam_max.x) }
+	if cam_min.y > cam_max.y { cam_pos.y = (cam_min.y + cam_max.y) / 2 }
+	else { cam_pos.y = clamp(cam_pos.y, cam_min.y, cam_max.y) }
 }
 
 spawn_button :: proc(
