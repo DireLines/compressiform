@@ -334,7 +334,20 @@ game_update :: proc(game: ^Game, dt: f64) {
 		}
 		mouse_screen_pos := linalg.to_f64(rl.GetMousePosition())
 		mouse_pos := screen_to_world(linalg.to_f64(rl.GetMousePosition()), screen_conversion)
-		get_draggables_at_cursor(mouse_pos)
+		dragged, dragging := game.dragged_object.?
+		if dragging {
+			dragged_obj := get_object(dragged)
+			dragged_obj.position = mouse_pos
+			if rl.IsMouseButtonReleased(.LEFT) {
+				game.dragged_object = nil
+			}
+		} else {
+			draggable_objects := get_draggables_at_cursor(mouse_pos)
+			click_started := len(draggable_objects) > 0 && rl.IsMouseButtonPressed(.LEFT)
+			if click_started {
+				drag_start(draggable_objects[0])
+			}
+		}
 		{it := hm.make_iter(&game.objects)
 			for tablet, h in all_objects_with_variant(&it, Tablet) {
 				collisions := game.collisions[h]
@@ -519,20 +532,23 @@ string_to_message :: proc(s: string) -> Message {
 }
 
 get_draggables_at_cursor :: proc(cursor_pos: vec2) -> []GameObjectHandle {
+	result := [dynamic]GameObjectHandle{}
 	it := hm.make_iter(&game.objects)
 	for obj, h in all_objects_with_tags(&it, .Draggable) {
 		world_box := get_bounding_box_for_moving_shape(
 			get_moving_hitbox_for_object(obj, game.final_transforms[h.idx].transform, 0).moving_shape,
 		)
 		if is_point_in_aabb(cursor_pos, world_box) {
-			print(obj.text)
+			append(&result, h)
 		}
 	}
-	return {}
+	return result[:]
 }
 
-drag_start :: proc() {
-
+drag_start :: proc(h: GameObjectHandle) {
+	game.dragged_object = h
+	obj := get_object(h)
+	obj.tags -= {.Collide}
 }
 
 drag_stop :: proc() {
