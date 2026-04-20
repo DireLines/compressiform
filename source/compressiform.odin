@@ -391,6 +391,16 @@ game_update :: proc(game: ^Game, dt: f64) {
 		when EDGE_SCROLL_ENABLED {camera_dir += edge_scroll()}
 		game.main_camera.position += 1000 * dt * camera_dir
 		clamp_camera_to_bounds(&game.main_camera.position, game.camera_bounds)
+		tablet, over_tablet := get_containing_tablet(game.mouse_world_pos).?
+		if over_tablet {
+			tablet_rect := aabb_to_rect(tablet.hitbox.shape.(AABB))
+			elem_pos := world_to_tablet(tablet, game.mouse_world_pos)
+			print(elem_pos)
+			message_idx := closest_message_idx_before(elem_pos, game.message)
+			draw_debug_circle(
+				tablet_to_world(tablet, world_to_tablet(tablet, game.mouse_world_pos)),
+			)
+		}
 		//do gravity
 		{it := object_iter()
 			for obj in all_objects_with_tags(&it, .Fall) {
@@ -669,22 +679,27 @@ drag_stop :: proc() {
 	if !over_tablet {return}
 	tablet_rect := aabb_to_rect(tablet.hitbox.shape.(AABB))
 	elem_pos := world_to_tablet(tablet, game.mouse_world_pos)
-	// message_idx := closest_message_idx_before(elem_pos, game.message)
+	print(elem_pos)
+	message_idx := closest_message_idx_before(elem_pos, game.message)
+	draw_debug_circle(tablet_to_world(tablet, world_to_tablet(tablet, game.mouse_world_pos)))
+}
 
 
-	get_containing_tablet :: proc(world_pos: vec2) -> Maybe(GameObjectInst(Tablet)) {
-		it := object_iter()
-		for obj, h in all_objects_with_variant(&it, Tablet) {
-			world_box := get_bounding_box_for_moving_shape(
-				get_moving_hitbox_for_object(obj, game.final_transforms[h.idx].transform, 0).moving_shape,
-			)
-			if is_point_in_aabb(world_pos, world_box) {
-				return obj
-			}
+get_containing_tablet :: proc(world_pos: vec2) -> Maybe(GameObjectInst(Tablet)) {
+	it := object_iter()
+	for obj, h in all_objects_with_variant(&it, Tablet) {
+		world_box := get_bounding_box_for_moving_shape(
+			get_moving_hitbox_for_object(obj, game.final_transforms[h.idx].transform, 0).moving_shape,
+		)
+		if is_point_in_aabb(world_pos, world_box) {
+			return obj
 		}
-		return nil //not over any tablet
 	}
+	return nil //not over any tablet
+}
 
+closest_message_idx_before :: proc(elem_pos: TabletPosition, message: Message) -> int {
+	return 0
 }
 print_message :: proc(m: ^Message) {
 	for element in m {
