@@ -164,6 +164,7 @@ GameFrameData :: struct {
 	objects_in_multiple_chunks: GameObjectSet `cbor:"-"`, //edge cases happen when objects are on edges or corners or just really big, this will let us know if we need to handle them
 	final_transforms:           [dynamic]TransformScreenSpace `cbor:"-"`, //computed at the start of each frame and after collision resolution, holds local->world transforms for each object in objects, index matched
 	collisions:                 Collisions,
+	mouse_pos:                  vec2,
 }
 //long type names
 Collisions :: map[GameObjectHandle][dynamic]Collision

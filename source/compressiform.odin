@@ -311,6 +311,9 @@ reset_game :: proc(g: ^Game = game) {
 //game-specific update logic (run once per frame)
 game_update :: proc(game: ^Game, dt: f64) {
 	timer := timer()
+	mouse_screen_pos := linalg.to_f64(rl.GetMousePosition())
+	mouse_pos := screen_to_world(linalg.to_f64(rl.GetMousePosition()), screen_conversion)
+	game.mouse_pos = mouse_pos
 	handle_ui_buttons()
 	switch game.stage {
 	case .Init:
@@ -337,7 +340,7 @@ game_update :: proc(game: ^Game, dt: f64) {
 		dragged, dragging := game.dragged_object.?
 		if dragging {
 			dragged_obj := get_object(dragged)
-			dragged_obj.position = mouse_pos
+			dragged_obj.position += mouse_pos - game.prev_frame.mouse_pos
 			if rl.IsMouseButtonReleased(.LEFT) {
 				game.dragged_object = nil
 			}
@@ -548,7 +551,6 @@ get_draggables_at_cursor :: proc(cursor_pos: vec2) -> []GameObjectHandle {
 drag_start :: proc(h: GameObjectHandle) {
 	game.dragged_object = h
 	obj := get_object(h)
-	obj.tags -= {.Collide}
 }
 
 drag_stop :: proc() {
