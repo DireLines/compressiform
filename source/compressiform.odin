@@ -811,17 +811,20 @@ tablet_to_local :: proc(tablet: GameObjectInst(Tablet), elem: TabletPosition) ->
 	return top_corner_of_content + {elem.col, line_height * f64(elem.line)}
 }
 tablet_to_world :: proc(tablet: GameObjectInst(Tablet), elem: TabletPosition) -> vec2 {
-	return local_to_world(tablet.handle, tablet_to_local(tablet, elem))
+	return local_to_world(tablet.handle, tablet_to_local(tablet, elem) + tablet.pivot)
 }
 
 local_to_tablet :: proc(tablet: GameObjectInst(Tablet), local_pos: vec2) -> TabletPosition {
 	tablet_rect := aabb_to_rect(tablet.hitbox.shape.(AABB))
+	line_width := tablet_rect.width * 0.8
 	line_height := (tablet_rect.height * 0.6) / LINES_PER_TABLET
 	top_corner_of_content :=
 		0.1 * vec2{tablet_rect.width, tablet_rect.height} - {475, 300} + tablet.pivot
 	diff := local_pos - top_corner_of_content
 	col := diff.x
+	col = clamp(col, 0, line_width)
 	line := int(math.round((diff.y / line_height)))
+	line = clamp(line, 0, LINES_PER_TABLET)
 	return TabletPosition{tablet = tablet.index_within_message, line = line, col = col}
 }
 
