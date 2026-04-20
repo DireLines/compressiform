@@ -1,6 +1,7 @@
 package game
 
 import "core:fmt"
+import "core:math"
 import "core:math/linalg"
 import "core:strings"
 import hm "handle_map_static"
@@ -14,10 +15,9 @@ UI_SECONDARY_FONT_SIZE :: 42
 IN_GAME_FONT_SIZE :: 50
 BACKGROUND_MAP_COLOR :: rl.Color{128, 128, 128, 255}
 CAMERA_MAP_COLOR :: rl.Color{99, 155, 255, 255}
-EDGE_SCROLL_MARGIN :: 50 // pixels from window edge that triggers scrolling
-CAMERA_BOUNDS_PADDING :: vec2{TILE_SIZE * 1.5, TILE_SIZE * 0.5} // extra world-space margin so walls stay visible
+EDGE_SCROLL_MARGIN :: 150 // pixels from window edge that triggers scrolling
+CAMERA_BOUNDS_PADDING :: vec2{TILE_SIZE * 1.5, TILE_SIZE * .5} // extra world-space margin so walls stay visible
 EDGE_SCROLL_ENABLED :: true
-WASD_ENABLED :: true
 STACK_START_COLOR :: rl.Color{255, 195, 59, 255}
 SLATE_GRAY :: rl.Color{210, 210, 220, 255}
 MENU_SCREEN_DIMS :: vec2{WINDOW_WIDTH, WINDOW_HEIGHT}
@@ -150,6 +150,10 @@ GameSpecificGlobalState :: struct {
 	color_to_spawn:       map[rl.Color]SpawnType,
 }
 
+GameSpecificFrameState :: struct {
+	mouse_screen_pos, mouse_world_pos: vec2,
+}
+
 
 //object variants
 //in contrast to tags, each object has exactly one variant
@@ -169,7 +173,9 @@ UIButton :: struct {
 	on_click_start:       proc(info: ButtonCallbackInfo) `cbor:"-"`, //triggered when mouse button down and hovering button
 	on_click:             proc(info: ButtonCallbackInfo) `cbor:"-"`, //triggered when mouse button up and hovering button - most of the time this is what you want
 }
-Tablet :: struct {}
+Tablet :: struct {
+	index_within_message: int,
+}
 GameObjectVariant :: union {
 	DefaultVariant,
 	Tablet,
@@ -265,31 +271,43 @@ game_start :: proc(game: ^Game) {
 	print("--- tricky cases ---")
 	print("synonym (big/large):", compute_similarity("the big house", "the large house"))
 	print("synonym (fast/quick):", compute_similarity("the fast runner", "the quick runner"))
-	print("abbreviation:", compute_similarity("compressing messages on tablets", "compress msgs on tabs"))
-	print("dropped filler:", compute_similarity("I am going to the store to buy some food", "going store buy food"))
-	print("paraphrase:", compute_similarity("the cat sat on the mat", "a feline rested on the rug"))
+	print(
+		"abbreviation:",
+		compute_similarity("compressing messages on tablets", "compress msgs on tabs"),
+	)
+	print(
+		"dropped filler:",
+		compute_similarity("I am going to the store to buy some food", "going store buy food"),
+	)
+	print(
+		"paraphrase:",
+		compute_similarity("the cat sat on the mat", "a feline rested on the rug"),
+	)
 	print("repetition padding:", compute_similarity("hello", "hello hello hello hello"))
-	print("actual level msg:", compute_similarity(
-		"In a world where they never figured out paper, important messages are still sent overseas on stone tablets",
-		"important messages sent overseas on stone tablets",
-	))
+	print(
+		"actual level msg:",
+		compute_similarity(
+			"In a world where they never figured out paper, important messages are still sent overseas on stone tablets",
+			"important messages sent overseas on stone tablets",
+		),
+	)
 	print("--- hard paraphrases ---")
-	print("clothing/boutique:", compute_similarity(
-		"Sally went to the clothing store.",
-		"Sally popped on over to the boutique.",
-	))
-	print("negation:", compute_similarity(
-		"I love this movie",
-		"I hate this movie",
-	))
-	print("passive voice:", compute_similarity(
-		"The dog chased the cat",
-		"The cat was chased by the dog",
-	))
-	print("totally unrelated:", compute_similarity(
-		"The stock market crashed yesterday",
-		"She baked a chocolate cake",
-	))
+	print(
+		"clothing/boutique:",
+		compute_similarity(
+			"Sally went to the clothing store.",
+			"Sally popped on over to the boutique.",
+		),
+	)
+	print("negation:", compute_similarity("I love this movie", "I hate this movie"))
+	print(
+		"passive voice:",
+		compute_similarity("The dog chased the cat", "The cat was chased by the dog"),
+	)
+	print(
+		"totally unrelated:",
+		compute_similarity("The stock market crashed yesterday", "She baked a chocolate cake"),
+	)
 	print("============================")
 
 	game.color_to_tiletype[rl.BLACK] = .Wall
@@ -354,9 +372,8 @@ reset_game :: proc(g: ^Game = game) {
 //game-specific update logic (run once per frame)
 game_update :: proc(game: ^Game, dt: f64) {
 	timer := timer()
-	mouse_screen_pos := linalg.to_f64(rl.GetMousePosition())
-	mouse_pos := screen_to_world(linalg.to_f64(rl.GetMousePosition()), screen_conversion)
-	game.mouse_pos = mouse_pos
+	game.mouse_screen_pos = linalg.to_f64(rl.GetMousePosition())
+	game.mouse_world_pos = screen_to_world(linalg.to_f64(rl.GetMousePosition()), screen_conversion)
 	handle_ui_buttons()
 	switch game.stage {
 	case .Init:
@@ -371,8 +388,7 @@ game_update :: proc(game: ^Game, dt: f64) {
 		}
 		game.screen_shake_amt = max(0, game.screen_shake_amt - SCREENSHAKE_DECAY * dt)
 		camera_dir := vec2{0, 0}
-		when WASD_ENABLED { camera_dir += WASD() }
-		when EDGE_SCROLL_ENABLED { camera_dir += edge_scroll() }
+		when EDGE_SCROLL_ENABLED {camera_dir += edge_scroll()}
 		game.main_camera.position += 1000 * dt * camera_dir
 		clamp_camera_to_bounds(&game.main_camera.position, game.camera_bounds)
 		//do gravity
@@ -382,17 +398,16 @@ game_update :: proc(game: ^Game, dt: f64) {
 				obj.acceleration.y += GRAVITY_STRENGTH
 			}
 		}
-		mouse_screen_pos := linalg.to_f64(rl.GetMousePosition())
-		mouse_pos := screen_to_world(linalg.to_f64(rl.GetMousePosition()), screen_conversion)
 		dragged, dragging := game.dragged_object.?
 		if dragging {
 			dragged_obj := get_object(dragged)
-			dragged_obj.position += mouse_pos - game.prev_frame.mouse_pos
+			mouse_world_diff := game.mouse_world_pos - game.prev_frame.mouse_world_pos
+			dragged_obj.position += mouse_world_diff
 			if rl.IsMouseButtonReleased(.LEFT) {
-				game.dragged_object = nil
+				drag_stop()
 			}
 		} else {
-			draggable_objects := get_draggables_at_cursor(mouse_pos)
+			draggable_objects := get_draggables_at_cursor(game.mouse_world_pos)
 			click_started := len(draggable_objects) > 0 && rl.IsMouseButtonPressed(.LEFT)
 			if click_started {
 				drag_start(draggable_objects[0])
@@ -434,6 +449,57 @@ game_update :: proc(game: ^Game, dt: f64) {
 		game.level_number += 1
 	case .GameOver:
 	//show new game button
+	}
+	get_axis :: proc(key_neg, key_pos: rl.KeyboardKey) -> f64 {
+		return f64(int(rl.IsKeyDown(key_pos))) - f64(int(rl.IsKeyDown(key_neg)))
+	}
+	WASD :: proc() -> vec2 {
+		return {get_axis(.A, .D), get_axis(.W, .S)}
+	}
+	edge_scroll :: proc() -> vec2 {
+		mouse := linalg.to_f64(rl.GetMousePosition())
+		screen := vec2{f64(rl.GetScreenWidth()), f64(rl.GetScreenHeight())}
+		dir := vec2{0, 0}
+		if mouse.x < EDGE_SCROLL_MARGIN {dir.x = -1}
+		if mouse.x > screen.x - EDGE_SCROLL_MARGIN {dir.x = 1}
+		if mouse.y < EDGE_SCROLL_MARGIN {dir.y = -1}
+		if mouse.y > screen.y - EDGE_SCROLL_MARGIN {dir.y = 1}
+		return dir
+	}
+
+	clamp_camera_to_bounds :: proc(cam_pos: ^vec2, bounds: Rect) {
+		half_screen := vec2{f64(rl.GetScreenWidth()), f64(rl.GetScreenHeight())} / 2
+		cam_min := vec2{bounds.x, bounds.y} + half_screen - CAMERA_BOUNDS_PADDING
+		cam_max :=
+			vec2{bounds.x + bounds.width, bounds.y + bounds.height} -
+			half_screen +
+			CAMERA_BOUNDS_PADDING
+		// if bounds are smaller than screen, center the camera
+		if cam_min.x >
+		   cam_max.x {cam_pos.x = (cam_min.x + cam_max.x) / 2} else {cam_pos.x = clamp(cam_pos.x, cam_min.x, cam_max.x)}
+		if cam_min.y >
+		   cam_max.y {cam_pos.y = (cam_min.y + cam_max.y) / 2} else {cam_pos.y = clamp(cam_pos.y, cam_min.y, cam_max.y)}
+	}
+}
+
+compute_camera_bounds :: proc(tilemap: Tilemap) -> Rect {
+	min_x, min_y := max(int), max(int)
+	max_x, max_y := min(int), min(int)
+	for r in 0 ..< len(tilemap) {
+		for c in 0 ..< len(tilemap[r]) {
+			if tilemap[r][c].type != .Wall {
+				min_x = min(min_x, r)
+				min_y = min(min_y, c)
+				max_x = max(max_x, r)
+				max_y = max(max_y, c)
+			}
+		}
+	}
+	return {
+		x = f64(min_x) * TILE_SIZE,
+		y = f64(min_y) * TILE_SIZE,
+		width = f64(max_x - min_x + 1) * TILE_SIZE,
+		height = f64(max_y - min_y + 1) * TILE_SIZE,
 	}
 }
 
@@ -601,9 +667,31 @@ drag_start :: proc(h: GameObjectHandle) {
 }
 
 drag_stop :: proc() {
+	dragged, dragging := game.dragged_object.?
+	if !dragging {return}
+	dragged_obj := get_object(dragged)
+	game.dragged_object = nil
+	tablet, over_tablet := get_containing_tablet(game.mouse_world_pos).?
+	if !over_tablet {return}
+	tablet_rect := aabb_to_rect(tablet.hitbox.shape.(AABB))
+	elem_pos := world_to_tablet(tablet, game.mouse_world_pos)
+	// message_idx := closest_message_idx_before(elem_pos, game.message)
+
+
+	get_containing_tablet :: proc(world_pos: vec2) -> Maybe(GameObjectInst(Tablet)) {
+		it := hm.make_iter(&game.objects)
+		for obj, h in all_objects_with_variant(&it, Tablet) {
+			world_box := get_bounding_box_for_moving_shape(
+				get_moving_hitbox_for_object(obj, game.final_transforms[h.idx].transform, 0).moving_shape,
+			)
+			if is_point_in_aabb(world_pos, world_box) {
+				return obj
+			}
+		}
+		return nil //not over any tablet
+	}
 
 }
-
 print_message :: proc(m: ^Message) {
 	for element in m {
 		print(
@@ -623,7 +711,7 @@ print_message :: proc(m: ^Message) {
 spawn_tablets :: proc(level: Level, message: ^Message) {
 	//divide message into tablet-sized chunks
 	num_tablets := set_message_element_positions(message, LETTERS_PER_LINE, LINES_PER_TABLET)
-	print_message(message)
+	// print_message(message)
 	//for each chunk, spawn tablet displaying that message
 	tablet_objects := [dynamic]GameObjectHandle{}
 	for i in 0 ..< num_tablets {
@@ -656,7 +744,7 @@ spawn_tablet :: proc(pos: vec2, message: ^Message, tablet_number: int) -> GameOb
 		velocity = {0, 100}, //throw it down
 		hitbox = {layer = .Default, shape = AABB{min = (-tex_dims / 2), max = tex_dims / 2}},
 		tags = {.Sprite, .Collide, .Fall},
-		variant = Tablet{},
+		variant = Tablet{tablet_number},
 	}
 	tablet_handle := spawn_object(tablet_def)
 	tablet := get_object(tablet_handle, Tablet)
@@ -665,48 +753,71 @@ spawn_tablet :: proc(pos: vec2, message: ^Message, tablet_number: int) -> GameOb
 		spawn_message_element_object(element, tablet)
 	}
 	return tablet_handle
-}
-//called from spawn_tablet
-spawn_message_element_object :: proc(
-	element: MessageElement,
-	tablet: GameObjectInst(Tablet),
-) -> GameObjectHandle {
-	text := get_message_element_text(element.content)
-	letter_size: f64 = 1 //TODO this probably won't end up being implemented
-	font_size := f32(letter_size * IN_GAME_FONT_SIZE)
-	size := get_message_element_size(element.content)
-	hitbox_offset := vec2{0, size.y / 2}
-	obj_def := GameObject {
-		name = text,
-		position = get_start_position_within_tablet(
-			aabb_to_rect(tablet.hitbox.shape.(AABB)),
-			element.position,
-		),
-		scale = {1, 1},
-		pivot = {0, 0},
-		parent_handle = tablet.handle,
-		render_info = {
-			render_layer = uint(RenderLayer.Ceiling),
-			texture = atlas_textures[.None],
-			text_render_info = {
-				text_color = SLATE_GRAY,
-				font_size = font_size,
-				text_alignment = .Left,
+
+	spawn_message_element_object :: proc(
+		element: MessageElement,
+		tablet: GameObjectInst(Tablet),
+	) -> GameObjectHandle {
+		text := get_message_element_text(element.content)
+		letter_size: f64 = 1 //TODO this probably won't end up being implemented
+		font_size := f32(letter_size * IN_GAME_FONT_SIZE)
+		size := get_message_element_size(element.content)
+		hitbox_offset := vec2{0, size.y / 2}
+		obj_def := GameObject {
+			name = text,
+			position = tablet_to_world(tablet, element.position),
+			scale = {1, 1},
+			pivot = {0, 0},
+			parent_handle = tablet.handle,
+			render_info = {
+				render_layer = uint(RenderLayer.Ceiling),
+				texture = atlas_textures[.None],
+				text_render_info = {
+					text_color = SLATE_GRAY,
+					font_size = font_size,
+					text_alignment = .Left,
+				},
 			},
-		},
-		hitbox = {shape = AABB{vec2{0, 0} - hitbox_offset, size - hitbox_offset}},
-		tags = {.Text, .Collide},
-		text = text,
+			hitbox = {shape = AABB{vec2{0, 0} - hitbox_offset, size - hitbox_offset}},
+			tags = {.Text, .Collide},
+			text = text,
+		}
+		return spawn_object(obj_def)
 	}
-	return spawn_object(obj_def)
 }
 
-get_start_position_within_tablet :: proc(tablet_rect: Rect, elem: MessageElementPosition) -> vec2 {
+
+tablet_to_local :: proc(tablet: GameObjectInst(Tablet), elem: MessageElementPosition) -> vec2 {
+	tablet_rect := aabb_to_rect(tablet.hitbox.shape.(AABB))
 	line_width := tablet_rect.width * 0.8
 	line_height := (tablet_rect.height * 0.6) / LINES_PER_TABLET
 	top_corner_of_content := 0.1 * vec2{tablet_rect.width, tablet_rect.height} - {475, 300}
 	return top_corner_of_content + {elem.pos, line_height * f64(elem.line)}
 }
+tablet_to_world :: proc(tablet: GameObjectInst(Tablet), elem: MessageElementPosition) -> vec2 {
+	return local_to_world(tablet.handle, tablet_to_local(tablet, elem))
+}
+
+local_to_tablet :: proc(
+	tablet: GameObjectInst(Tablet),
+	local_pos: vec2,
+) -> MessageElementPosition {
+	tablet_rect := aabb_to_rect(tablet.hitbox.shape.(AABB))
+	line_width := tablet_rect.width * 0.8
+	line_height := (tablet_rect.height * 0.6) / LINES_PER_TABLET
+	top_corner_of_content := 0.1 * vec2{tablet_rect.width, tablet_rect.height} - {475, 300}
+	pos := local_pos.x - top_corner_of_content.x
+	line := math.round((local_pos.y))
+	return {}
+}
+
+world_to_tablet :: proc(
+	tablet: GameObjectInst(Tablet),
+	world_pos: vec2,
+) -> MessageElementPosition {
+	return local_to_tablet(tablet, world_to_local(tablet.handle, world_pos))
+}
+
 
 level_start :: proc(level: Level) {
 	message := string_to_message(level.target_message)
@@ -718,52 +829,6 @@ level_score :: proc(level: Level) -> f64 {
 	return compute_similarity(level.target_message, compressed)
 }
 // end_current_level :: proc() {}
-get_axis :: proc(key_neg, key_pos: rl.KeyboardKey) -> f64 {
-	return f64(int(rl.IsKeyDown(key_pos))) - f64(int(rl.IsKeyDown(key_neg)))
-}
-WASD :: proc() -> vec2 {
-	return {get_axis(.A, .D), get_axis(.W, .S)}
-}
-edge_scroll :: proc() -> vec2 {
-	mouse := linalg.to_f64(rl.GetMousePosition())
-	screen := vec2{f64(rl.GetScreenWidth()), f64(rl.GetScreenHeight())}
-	dir := vec2{0, 0}
-	if mouse.x < EDGE_SCROLL_MARGIN { dir.x = -1 }
-	if mouse.x > screen.x - EDGE_SCROLL_MARGIN { dir.x = 1 }
-	if mouse.y < EDGE_SCROLL_MARGIN { dir.y = -1 }
-	if mouse.y > screen.y - EDGE_SCROLL_MARGIN { dir.y = 1 }
-	return dir
-}
-compute_camera_bounds :: proc(tilemap: Tilemap) -> Rect {
-	min_x, min_y := max(int), max(int)
-	max_x, max_y := min(int), min(int)
-	for r in 0 ..< len(tilemap) {
-		for c in 0 ..< len(tilemap[r]) {
-			if tilemap[r][c].type != .Wall {
-				min_x = min(min_x, r)
-				min_y = min(min_y, c)
-				max_x = max(max_x, r)
-				max_y = max(max_y, c)
-			}
-		}
-	}
-	return {
-		x = f64(min_x) * TILE_SIZE,
-		y = f64(min_y) * TILE_SIZE,
-		width = f64(max_x - min_x + 1) * TILE_SIZE,
-		height = f64(max_y - min_y + 1) * TILE_SIZE,
-	}
-}
-clamp_camera_to_bounds :: proc(cam_pos: ^vec2, bounds: Rect) {
-	half_screen := vec2{f64(rl.GetScreenWidth()), f64(rl.GetScreenHeight())} / 2
-	cam_min := vec2{bounds.x, bounds.y} + half_screen - CAMERA_BOUNDS_PADDING
-	cam_max := vec2{bounds.x + bounds.width, bounds.y + bounds.height} - half_screen + CAMERA_BOUNDS_PADDING
-	// if bounds are smaller than screen, center the camera
-	if cam_min.x > cam_max.x { cam_pos.x = (cam_min.x + cam_max.x) / 2 }
-	else { cam_pos.x = clamp(cam_pos.x, cam_min.x, cam_max.x) }
-	if cam_min.y > cam_max.y { cam_pos.y = (cam_min.y + cam_max.y) / 2 }
-	else { cam_pos.y = clamp(cam_pos.y, cam_min.y, cam_max.y) }
-}
 
 spawn_button :: proc(
 	pos: vec2,
