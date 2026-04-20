@@ -334,7 +334,7 @@ game_update :: proc(game: ^Game, dt: f64) {
 		}
 		mouse_screen_pos := linalg.to_f64(rl.GetMousePosition())
 		mouse_pos := screen_to_world(linalg.to_f64(rl.GetMousePosition()), screen_conversion)
-		mouse_tile := get_containing_tile(mouse_pos)
+		get_draggables_at_cursor(mouse_pos)
 		{it := hm.make_iter(&game.objects)
 			for tablet, h in all_objects_with_variant(&it, Tablet) {
 				collisions := game.collisions[h]
@@ -518,12 +518,18 @@ string_to_message :: proc(s: string) -> Message {
 	return result
 }
 
-// get_draggables_at_cursor :: proc(cursor_pos: vec2) -> []GameObjectHandle {
-// 	it := hm.make_iter(&game.objects)
-// 	for obj in all_objects_with_tags(&it, .Draggable) {
-// 		obj.hitbox
-// 	}
-// }
+get_draggables_at_cursor :: proc(cursor_pos: vec2) -> []GameObjectHandle {
+	it := hm.make_iter(&game.objects)
+	for obj, h in all_objects_with_tags(&it, .Draggable) {
+		world_box := get_bounding_box_for_moving_shape(
+			get_moving_hitbox_for_object(obj, game.final_transforms[h.idx].transform, 0).moving_shape,
+		)
+		if is_point_in_aabb(cursor_pos, world_box) {
+			print(obj.text)
+		}
+	}
+	return {}
+}
 
 drag_start :: proc() {
 
@@ -604,6 +610,7 @@ spawn_message_element_object :: proc(
 	letter_size: f64 = 1 //TODO this probably won't end up being implemented
 	font_size := f32(letter_size * IN_GAME_FONT_SIZE)
 	size := get_message_element_size(element.content)
+	hitbox_offset := vec2{0, size.y / 2}
 	obj_def := GameObject {
 		name = text,
 		position = get_start_position_within_tablet(
@@ -622,7 +629,7 @@ spawn_message_element_object :: proc(
 				text_alignment = .Left,
 			},
 		},
-		hitbox = {shape = AABB{vec2{0, 0} - {0, size.y / 2}, size - {0, size.y / 2}}},
+		hitbox = {shape = AABB{vec2{0, 0} - hitbox_offset, size - hitbox_offset}},
 		tags = {.Text, .Collide},
 		text = text,
 	}

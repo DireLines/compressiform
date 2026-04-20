@@ -147,7 +147,6 @@ get_texture_aabb_for_object :: proc(obj: ^GameObject, transform: mat3) -> AABB {
 	return {linalg.min(c1, c2), linalg.max(c1, c2)}
 }
 
-
 remake_chunks :: proc(dt: f64) {
 	clear_map(&game.objects_in_multiple_chunks)
 	clear_map(&game.chunks)
