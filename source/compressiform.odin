@@ -3,7 +3,6 @@ package game
 import "core:fmt"
 import "core:math"
 import "core:math/linalg"
-import "core:os"
 import "core:slice"
 import "core:strings"
 import hm "handle_map_static"
@@ -61,6 +60,7 @@ ObjectTag :: enum {
 	//user-defined tags
 	Draggable,
 	Fall,
+	InMessage,
 }
 
 SpawnType :: enum {
@@ -120,12 +120,13 @@ TabletPosition :: struct {
 MessageElement :: struct {
 	content:        MessageContent,
 	using position: TabletPosition,
+	h:              Maybe(GameObjectHandle),
 }
 Message :: [dynamic]MessageElement
 
 GameSpecificProps :: struct {
-	text:                string,
-	get_message_element: proc() -> MessageElement,
+	text:            string,
+	message_element: Maybe(MessageElement),
 }
 
 ChunkLoadingMode :: enum {
@@ -148,6 +149,7 @@ GameSpecificGlobalState :: struct {
 	screen_shake_amt:     f64,
 	screen_shake:         vec2,
 	tablet_stack_bottom:  vec2,
+	tablet_objects:       [dynamic]GameObjectHandle,
 	color_to_tiletype:    map[rl.Color]TileType,
 	color_to_spawn:       map[rl.Color]SpawnType,
 }
@@ -259,59 +261,44 @@ GameStage :: enum {
 	GameOver,
 }
 
+run_nlp_smoke_test :: proc() {
+	tests := []struct {
+		name, a, b: string,
+	} {
+		{"identical", "hello world", "hello world"},
+		{"subset", "the quick brown fox jumps", "quick fox"},
+		{"no overlap", "hello world", "goodbye moon"},
+		{"case insensitive", "Hello World", "hello world"},
+		{"empty vs text", "", "hello"},
+		{"reordered", "stone tablet message", "message stone tablet"},
+		{"synonym (big/large)", "the big house", "the large house"},
+		{"synonym (fast/quick)", "the fast runner", "the quick runner"},
+		{"abbreviation", "compressing messages on tablets", "compress msgs on tabs"},
+		{"dropped filler", "I am going to the store to buy some food", "going store buy food"},
+		{"paraphrase", "the cat sat on the mat", "a feline rested on the rug"},
+		{"repetition padding", "hello", "hello hello hello hello"},
+		{
+			"actual level msg",
+			"In a world where they never figured out paper, important messages are still sent overseas on stone tablets",
+			"important messages sent overseas on stone tablets",
+		},
+		{
+			"clothing/boutique",
+			"Sally went to the clothing store.",
+			"Sally popped on over to the boutique.",
+		},
+		{"negation", "I love this movie", "I hate this movie"},
+		{"passive voice", "The dog chased the cat", "The cat was chased by the dog"},
+		{"totally unrelated", "The stock market crashed yesterday", "She baked a chocolate cake"},
+	}
+	for test in tests {
+		print(test.name, ":", compute_similarity(test.a, test.b))
+	}
+}
 //game-specific initialization logic (run once when game is started)
 //typically this will be "set up the main menu"
 game_start :: proc(game: ^Game) {
-	// NLP smoke test — remove after verifying
-	print("=== NLP similarity tests ===")
-	print("identical:", compute_similarity("hello world", "hello world"))
-	print("subset:", compute_similarity("the quick brown fox jumps", "quick fox"))
-	print("no overlap:", compute_similarity("hello world", "goodbye moon"))
-	print("case insensitive:", compute_similarity("Hello World", "hello world"))
-	print("empty vs text:", compute_similarity("", "hello"))
-	print("reordered:", compute_similarity("stone tablet message", "message stone tablet"))
-	print("--- tricky cases ---")
-	print("synonym (big/large):", compute_similarity("the big house", "the large house"))
-	print("synonym (fast/quick):", compute_similarity("the fast runner", "the quick runner"))
-	print(
-		"abbreviation:",
-		compute_similarity("compressing messages on tablets", "compress msgs on tabs"),
-	)
-	print(
-		"dropped filler:",
-		compute_similarity("I am going to the store to buy some food", "going store buy food"),
-	)
-	print(
-		"paraphrase:",
-		compute_similarity("the cat sat on the mat", "a feline rested on the rug"),
-	)
-	print("repetition padding:", compute_similarity("hello", "hello hello hello hello"))
-	print(
-		"actual level msg:",
-		compute_similarity(
-			"In a world where they never figured out paper, important messages are still sent overseas on stone tablets",
-			"important messages sent overseas on stone tablets",
-		),
-	)
-	print("--- hard paraphrases ---")
-	print(
-		"clothing/boutique:",
-		compute_similarity(
-			"Sally went to the clothing store.",
-			"Sally popped on over to the boutique.",
-		),
-	)
-	print("negation:", compute_similarity("I love this movie", "I hate this movie"))
-	print(
-		"passive voice:",
-		compute_similarity("The dog chased the cat", "The cat was chased by the dog"),
-	)
-	print(
-		"totally unrelated:",
-		compute_similarity("The stock market crashed yesterday", "She baked a chocolate cake"),
-	)
-	print("============================")
-
+	// run_nlp_smoke_test()
 	game.color_to_tiletype[rl.BLACK] = .Wall
 	game.color_to_tiletype[STACK_START_COLOR] = .Wall
 	game.color_to_tiletype[BACKGROUND_MAP_COLOR] = .None
@@ -377,6 +364,7 @@ game_update :: proc(game: ^Game, dt: f64) {
 	game.mouse_screen_pos = linalg.to_f64(rl.GetMousePosition())
 	game.mouse_world_pos = screen_to_world(linalg.to_f64(rl.GetMousePosition()), screen_conversion)
 	handle_ui_buttons()
+	timer->time("handle ui buttons")
 	switch game.stage {
 	case .Init:
 	case .Started:
@@ -394,26 +382,44 @@ game_update :: proc(game: ^Game, dt: f64) {
 		when EDGE_SCROLL_ENABLED {camera_dir += edge_scroll()}
 		game.main_camera.position += 1000 * dt * camera_dir
 		clamp_camera_to_bounds(&game.main_camera.position, game.camera_bounds)
+		timer->time("camera move")
 
-		//do gravity
 		{it := object_iter()
 			for obj in all_objects_with_tags(&it, .Fall) {
 				GRAVITY_STRENGTH :: 800
 				obj.acceleration.y += GRAVITY_STRENGTH
 			}
 		}
+		timer->time("gravity")
 
-
-		tablet, over_tablet := get_containing_tablet(game.mouse_world_pos).?
-		if over_tablet {
-			tablet_rect := aabb_to_rect(tablet.hitbox.shape.(AABB))
-			elem_pos := world_to_tablet(tablet, game.mouse_world_pos)
-			draw_debug_circle(
-				tablet_to_world(tablet, world_to_tablet(tablet, game.mouse_world_pos)),
-			)
-			message_idx := closest_message_idx_before(elem_pos, &game.message)
-			print(elem_pos, message_idx)
+		set_message_element_positions(&game.message)
+		{it := object_iter()
+			for obj in all_objects_with_tags(&it, .InMessage, .Draggable) {
+				m, has_message := obj.message_element.?
+				if !has_message {continue}
+				obj.position = linalg.lerp(obj.position, tablet_to_world(m.position), 0.8)
+			}
 		}
+		timer->time("update message element pos")
+
+
+		// tablet, over_tablet := get_containing_tablet(game.mouse_world_pos).?
+		// if over_tablet {
+		// 	tablet_rect := aabb_to_rect(tablet.hitbox.shape.(AABB))
+		// 	elem_pos := world_to_tablet(tablet, game.mouse_world_pos)
+		// 	draw_debug_circle(tablet_to_world(world_to_tablet(tablet, game.mouse_world_pos)))
+		// 	message_idx := closest_message_idx_before(elem_pos, &game.message)
+		// 	if message_idx == -1 {
+		// 		print("before everything")
+		// 	} else {
+		// 		#partial switch c in game.message[message_idx].content {
+		// 		case Word:
+		// 			print(c.str)
+		// 		case:
+		// 			print(c)
+		// 		}
+		// 	}
+		// }
 
 		dragged, dragging := game.dragged_object.?
 		if dragging {
@@ -430,6 +436,7 @@ game_update :: proc(game: ^Game, dt: f64) {
 				drag_start(draggable_objects[0])
 			}
 		}
+		timer->time("handle click/drag")
 
 		{it := object_iter()
 			for tablet, h in all_objects_with_variant(&it, Tablet) {
@@ -456,6 +463,7 @@ game_update :: proc(game: ^Game, dt: f64) {
 				}
 			}
 		}
+		timer->time("tablet thud")
 
 	// print(mouse_pos, mouse_tile)
 
@@ -618,12 +626,7 @@ get_message_element_size :: proc(element: MessageContent) -> vec2 {
 
 //figure out the line, column and tablet number of all the things in the message
 //basically just laying out text into pages
-set_message_element_positions :: proc(
-	message: ^Message,
-	letters_per_line, lines_per_tablet: int,
-) -> (
-	num_tablets_needed: int,
-) {
+set_message_element_positions :: proc(message: ^Message) -> (num_tablets_needed: int) {
 	AVG_PIXELS_PER_LETTER: f64 : 22 //measured
 	WORD_SPACING_PIXELS: f64 : 20
 	tablet := 0
@@ -635,16 +638,21 @@ set_message_element_positions :: proc(
 		elem_len_with_space := elem_len + WORD_SPACING_PIXELS
 		column += elem_len_with_space
 		//fix run off end of line
-		if column - WORD_SPACING_PIXELS > f64(letters_per_line) * AVG_PIXELS_PER_LETTER {
+		if column - WORD_SPACING_PIXELS > f64(LETTERS_PER_LINE) * AVG_PIXELS_PER_LETTER {
 			column = elem_len_with_space
 			line += 1
 		}
 		//fix run off end of tablet
-		if line > lines_per_tablet {
+		if line > LINES_PER_TABLET {
 			line = 0
 			tablet += 1
 		}
 		element.position = {tablet, line, column - elem_len_with_space}
+		h, has_obj := element.h.?
+		if has_obj {
+			obj := get_object(h)
+			obj.message_element = element
+		}
 	}
 	return tablet + 1
 }
@@ -676,7 +684,18 @@ get_draggables_at_cursor :: proc(cursor_pos: vec2) -> []GameObjectHandle {
 
 drag_start :: proc(h: GameObjectHandle) {
 	game.dragged_object = h
-	obj := get_object(h)
+	dragged_obj := get_object(h)
+	tablet, over_tablet := get_containing_tablet(game.mouse_world_pos).?
+	if !over_tablet {return}
+	tablet_rect := aabb_to_rect(tablet.hitbox.shape.(AABB))
+	elem_pos := world_to_tablet(tablet, game.mouse_world_pos)
+	message_idx := closest_message_idx_before(elem_pos, &game.message)
+	obj_message_content, has_message_content := dragged_obj.message_element.?
+	if has_message_content {
+		remove_range(&game.message, message_idx, message_idx + 1)
+		set_message_element_positions(&game.message)
+		dragged_obj.tags -= {.InMessage}
+	}
 }
 
 drag_stop :: proc() {
@@ -689,7 +708,12 @@ drag_stop :: proc() {
 	tablet_rect := aabb_to_rect(tablet.hitbox.shape.(AABB))
 	elem_pos := world_to_tablet(tablet, game.mouse_world_pos)
 	message_idx := closest_message_idx_before(elem_pos, &game.message)
-	print(elem_pos, message_idx)
+	obj_message_content, has_message_content := dragged_obj.message_element.?
+	if has_message_content {
+		inject_at_elem(&game.message, message_idx, obj_message_content)
+		set_message_element_positions(&game.message)
+		dragged_obj.tags += {.InMessage}
+	}
 }
 
 
@@ -721,7 +745,7 @@ tablet_pos_less :: proc(a, b: MessageElement) -> bool {
 
 closest_message_idx_before :: proc(elem_pos: TabletPosition, message: ^Message) -> int {
 	idx, _ := slice.binary_search_by(message[:], elem_pos, compare_tablet_pos)
-	return idx
+	return idx - 1
 }
 print_message :: proc(m: ^Message) {
 	for element in m {
@@ -741,22 +765,60 @@ print_message :: proc(m: ^Message) {
 //called at start of level
 spawn_tablets :: proc(level: Level, message: ^Message) {
 	//divide message into tablet-sized chunks
-	num_tablets := set_message_element_positions(message, LETTERS_PER_LINE, LINES_PER_TABLET)
+	num_tablets := set_message_element_positions(message)
 	// print_message(message)
 	//for each chunk, spawn tablet displaying that message
-	tablet_objects := [dynamic]GameObjectHandle{}
+	game.tablet_objects = make([dynamic]GameObjectHandle)
 	for i in 0 ..< num_tablets {
 		tablet_start_height :: 1500
 		tablet_offset: vec2 : {1200, -800}
-		spawn_tablet(
-			game.tablet_stack_bottom -
-			{tablet_offset.x, tablet_start_height} +
-			f64(i) * tablet_offset,
-			message,
-			i,
+		append(
+			&game.tablet_objects,
+			spawn_tablet(
+				game.tablet_stack_bottom -
+				{tablet_offset.x, tablet_start_height} +
+				f64(i) * tablet_offset,
+				message,
+				i,
+			),
 		)
 	}
+	for &element in message {
+		h := spawn_message_element_object(element)
+		element.h = h
+	}
 }
+
+spawn_message_element_object :: proc(element: MessageElement) -> GameObjectHandle {
+	tablet: GameObjectInst(Tablet) = get_object(game.tablet_objects[element.tablet], Tablet)
+	text := get_message_element_text(element.content)
+	letter_size: f64 = 1 //TODO this probably won't end up being implemented
+	font_size := f32(letter_size * IN_GAME_FONT_SIZE)
+	size := get_message_element_size(element.content)
+	hitbox_offset := vec2{0, size.y / 2}
+	obj_def := GameObject {
+		name = text,
+		position = tablet_to_local(element.position),
+		scale = {1, 1},
+		pivot = {0, 0},
+		parent_handle = tablet.handle,
+		render_info = {
+			render_layer = uint(RenderLayer.Ceiling),
+			texture = atlas_textures[.None],
+			text_render_info = {
+				text_color = SLATE_GRAY,
+				font_size = font_size,
+				text_alignment = .Left,
+			},
+		},
+		hitbox = {shape = AABB{vec2{0, 0} - hitbox_offset, size - hitbox_offset}},
+		tags = {.Text, .Collide, .InMessage},
+		text = text,
+		message_element = element,
+	}
+	return spawn_object(obj_def)
+}
+
 //called from spawn_tablets
 spawn_tablet :: proc(pos: vec2, message: ^Message, tablet_number: int) -> GameObjectHandle {
 	//shoot bullet
@@ -777,56 +839,20 @@ spawn_tablet :: proc(pos: vec2, message: ^Message, tablet_number: int) -> GameOb
 		tags = {.Sprite, .Collide, .Fall},
 		variant = Tablet{tablet_number},
 	}
-	tablet_handle := spawn_object(tablet_def)
-	tablet := get_object(tablet_handle, Tablet)
-	for element in message {
-		if element.tablet != tablet_number {continue}
-		spawn_message_element_object(element, tablet)
-	}
-	return tablet_handle
-
-	spawn_message_element_object :: proc(
-		element: MessageElement,
-		tablet: GameObjectInst(Tablet),
-	) -> GameObjectHandle {
-		text := get_message_element_text(element.content)
-		letter_size: f64 = 1 //TODO this probably won't end up being implemented
-		font_size := f32(letter_size * IN_GAME_FONT_SIZE)
-		size := get_message_element_size(element.content)
-		hitbox_offset := vec2{0, size.y / 2}
-		obj_def := GameObject {
-			name = text,
-			position = tablet_to_local(tablet, element.position),
-			scale = {1, 1},
-			pivot = {0, 0},
-			parent_handle = tablet.handle,
-			render_info = {
-				render_layer = uint(RenderLayer.Ceiling),
-				texture = atlas_textures[.None],
-				text_render_info = {
-					text_color = SLATE_GRAY,
-					font_size = font_size,
-					text_alignment = .Left,
-				},
-			},
-			hitbox = {shape = AABB{vec2{0, 0} - hitbox_offset, size - hitbox_offset}},
-			tags = {.Text, .Collide},
-			text = text,
-		}
-		return spawn_object(obj_def)
-	}
+	return spawn_object(tablet_def)
 }
 
-
-tablet_to_local :: proc(tablet: GameObjectInst(Tablet), elem: TabletPosition) -> vec2 {
+tablet_to_local :: proc(elem: TabletPosition) -> vec2 {
+	tablet: GameObjectInst(Tablet) = get_object(game.tablet_objects[elem.tablet], Tablet)
 	tablet_rect := aabb_to_rect(tablet.hitbox.shape.(AABB))
 	line_width := tablet_rect.width * 0.8
 	line_height := (tablet_rect.height * 0.6) / LINES_PER_TABLET
 	top_corner_of_content := 0.1 * vec2{tablet_rect.width, tablet_rect.height} - {475, 300}
 	return top_corner_of_content + {elem.col, line_height * f64(elem.line)}
 }
-tablet_to_world :: proc(tablet: GameObjectInst(Tablet), elem: TabletPosition) -> vec2 {
-	return local_to_world(tablet.handle, tablet_to_local(tablet, elem) + tablet.pivot)
+tablet_to_world :: proc(elem: TabletPosition) -> vec2 {
+	tablet: GameObjectInst(Tablet) = get_object(game.tablet_objects[elem.tablet], Tablet)
+	return local_to_world(tablet.handle, tablet_to_local(elem) + tablet.pivot)
 }
 
 local_to_tablet :: proc(tablet: GameObjectInst(Tablet), local_pos: vec2) -> TabletPosition {
