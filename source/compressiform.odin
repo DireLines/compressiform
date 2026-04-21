@@ -3,6 +3,8 @@ package game
 import "core:fmt"
 import "core:math"
 import "core:math/linalg"
+import "core:os"
+import "core:slice"
 import "core:strings"
 import hm "handle_map_static"
 import maps "mapgen"
@@ -406,11 +408,11 @@ game_update :: proc(game: ^Game, dt: f64) {
 		if over_tablet {
 			tablet_rect := aabb_to_rect(tablet.hitbox.shape.(AABB))
 			elem_pos := world_to_tablet(tablet, game.mouse_world_pos)
-			print(elem_pos)
-			message_idx := closest_message_idx_before(elem_pos, game.message)
 			draw_debug_circle(
 				tablet_to_world(tablet, world_to_tablet(tablet, game.mouse_world_pos)),
 			)
+			message_idx := closest_message_idx_before(elem_pos, &game.message)
+			print(elem_pos, message_idx)
 		}
 
 		dragged, dragging := game.dragged_object.?
@@ -686,9 +688,8 @@ drag_stop :: proc() {
 	if !over_tablet {return}
 	tablet_rect := aabb_to_rect(tablet.hitbox.shape.(AABB))
 	elem_pos := world_to_tablet(tablet, game.mouse_world_pos)
-	print(elem_pos)
-	message_idx := closest_message_idx_before(elem_pos, game.message)
-	draw_debug_circle(tablet_to_world(tablet, world_to_tablet(tablet, game.mouse_world_pos)))
+	message_idx := closest_message_idx_before(elem_pos, &game.message)
+	print(elem_pos, message_idx)
 }
 
 
@@ -705,8 +706,22 @@ get_containing_tablet :: proc(world_pos: vec2) -> Maybe(GameObjectInst(Tablet)) 
 	return nil //not over any tablet
 }
 
-closest_message_idx_before :: proc(elem_pos: TabletPosition, message: Message) -> int {
-	return 0
+compare_tablet_pos :: proc(a: MessageElement, b: TabletPosition) -> slice.Ordering {
+	if a.tablet < b.tablet {return .Less}
+	if a.tablet > b.tablet {return .Greater}
+	if a.line < b.line {return .Less}
+	if a.line > b.line {return .Greater}
+	if a.col < b.col {return .Less}
+	if a.col > b.col {return .Greater}
+	return .Equal
+}
+tablet_pos_less :: proc(a, b: MessageElement) -> bool {
+	return compare_tablet_pos(a, b.position) == .Less
+}
+
+closest_message_idx_before :: proc(elem_pos: TabletPosition, message: ^Message) -> int {
+	idx, _ := slice.binary_search_by(message[:], elem_pos, compare_tablet_pos)
+	return idx
 }
 print_message :: proc(m: ^Message) {
 	for element in m {
@@ -821,10 +836,8 @@ local_to_tablet :: proc(tablet: GameObjectInst(Tablet), local_pos: vec2) -> Tabl
 	top_corner_of_content :=
 		0.1 * vec2{tablet_rect.width, tablet_rect.height} - {475, 300} + tablet.pivot
 	diff := local_pos - top_corner_of_content
-	col := diff.x
-	col = clamp(col, 0, line_width)
-	line := int(math.round((diff.y / line_height)))
-	line = clamp(line, 0, LINES_PER_TABLET)
+	col := clamp(diff.x, 0, line_width)
+	line := clamp(int(math.round((diff.y / line_height))), 0, LINES_PER_TABLET)
 	return TabletPosition{tablet = tablet.index_within_message, line = line, col = col}
 }
 
@@ -834,8 +847,8 @@ world_to_tablet :: proc(tablet: GameObjectInst(Tablet), world_pos: vec2) -> Tabl
 
 
 level_start :: proc(level: Level) {
-	message := string_to_message(level.target_message)
-	spawn_tablets(level, &message)
+	game.message = string_to_message(level.target_message)
+	spawn_tablets(level, &game.message)
 }
 level_end :: proc(level: Level) {}
 level_score :: proc(level: Level) -> f64 {
