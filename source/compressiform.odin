@@ -20,7 +20,7 @@ EDGE_SCROLL_MARGIN :: 150 // pixels from window edge that triggers scrolling
 CAMERA_BOUNDS_PADDING :: vec2{TILE_SIZE * 1.5, TILE_SIZE * .5} // extra world-space margin so walls stay visible
 EDGE_SCROLL_ENABLED :: true
 STACK_START_COLOR :: rl.Color{255, 195, 59, 255}
-SLATE_GRAY :: rl.Color{210, 210, 220, 255}
+SLATE_GRAY :: rl.Color{30, 30, 33, 255}
 MENU_SCREEN_DIMS :: vec2{WINDOW_WIDTH, WINDOW_HEIGHT}
 LETTERS_PER_LINE :: 30
 LINES_PER_TABLET :: 10

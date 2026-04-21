@@ -92,7 +92,7 @@ web: #build for web using emscripten
 		-define:show_fps=false \
 		-strict-style -out:$(WEB_DIR)/game.wasm.o
 	cp $(ODIN_ROOT)/core/sys/wasm/js/odin.js $(WEB_DIR)
-	python "$(EMSCRIPTEN_SDK_DIR)/upstream/emscripten/emcc.py" -g -o $(WEB_DIR)/index.html \
+	python3 "$(EMSCRIPTEN_SDK_DIR)/upstream/emscripten/emcc.py" -g -o $(WEB_DIR)/index.html \
 		$(WEB_DIR)/game.wasm.o \
 		$(ODIN_ROOT)/vendor/raylib/wasm/libraylib.a \
 		$(ODIN_ROOT)/vendor/raylib/wasm/libraygui.a \
