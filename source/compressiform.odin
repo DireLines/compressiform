@@ -20,7 +20,8 @@ EDGE_SCROLL_MARGIN :: 150 // pixels from window edge that triggers scrolling
 CAMERA_BOUNDS_PADDING :: vec2{TILE_SIZE * 1.5, TILE_SIZE * .5} // extra world-space margin so walls stay visible
 EDGE_SCROLL_ENABLED :: true
 STACK_START_COLOR :: rl.Color{255, 195, 59, 255}
-SLATE_GRAY :: rl.Color{30, 30, 33, 255}
+SLATE_INSCRIPTION :: rl.Color{30, 30, 33, 255}
+SLATE_GRAY :: rl.Color{200, 200, 210, 255}
 MENU_SCREEN_DIMS :: vec2{WINDOW_WIDTH, WINDOW_HEIGHT}
 LETTERS_PER_LINE :: 30
 LINES_PER_TABLET :: 10
@@ -392,15 +393,17 @@ game_update :: proc(game: ^Game, dt: f64) {
 		}
 		timer->time("gravity")
 
-		set_message_element_positions(&game.message)
-		{it := object_iter()
-			for obj in all_objects_with_tags(&it, .InMessage, .Draggable) {
-				m, has_message := obj.message_element.?
-				if !has_message {continue}
-				obj.position = linalg.lerp(obj.position, tablet_to_world(m.position), 0.8)
+		if _, dragging := game.dragged_object.?; !dragging {
+			set_message_element_positions(&game.message)
+			{it := object_iter()
+				for obj in all_objects_with_tags(&it, .InMessage, .Draggable) {
+					m, has_message := obj.message_element.?
+					if !has_message {continue}
+					obj.position = linalg.lerp(obj.position, tablet_to_world(m.position), 0.8)
+				}
 			}
+			timer->time("update message element pos")
 		}
-		timer->time("update message element pos")
 
 
 		// tablet, over_tablet := get_containing_tablet(game.mouse_world_pos).?
@@ -806,7 +809,7 @@ spawn_message_element_object :: proc(element: MessageElement) -> GameObjectHandl
 			render_layer = uint(RenderLayer.Ceiling),
 			texture = atlas_textures[.None],
 			text_render_info = {
-				text_color = SLATE_GRAY,
+				text_color = SLATE_INSCRIPTION,
 				font_size = font_size,
 				text_alignment = .Left,
 			},
