@@ -30,7 +30,7 @@ SCREENSHAKE_DECAY :: 18
 @(rodata)
 LEVELS := []Level {
 	{
-		target_message = "Made for Ludum Dare 59 by Nathaniel Saxe and Ryan Kann. -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ In a world where they never figured out paper, important messages are sent overseas on stone tablets like these. You are in charge of compressing longer messages until they can fit on a single boat, saving your shipping company millions each year. Speaking of which, this boat can only fit 2 stone tablets, so you'll have to figure out a way to make the message a bit smaller. Looks like '-_-_-_-_-_-_-_-_-_-_-_-_-_-_' is repeated a bunch of times in a row on the first tablet, maybe you can use a number as a shorthand for how many times that part of the message was repeated.",
+		target_message = "Made for Ludum Dare 59 by Nathaniel Saxe and Ryan Kann. -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ -_-_-_-_-_-_-_-_-_-_-_-_-_-_ In a world where they never figured out paper, important messages are sent overseas on stone tablets like these. You are in charge of compressing longer messages until they can fit on a single boat, saving your shipping company millions each year. Speaking of which, this boat can only fit 2 stone tablets, so you'll have to figure out a way to make the message a bit smaller. Looks like -_-_-_-_-_-_-_-_-_-_-_-_-_-_ is repeated a bunch of times in a row on the first tablet, maybe you can use a number as a shorthand for how many times that part of the message was repeated.",
 		max_tablets = 3,
 		time_limit = 180,
 	},
@@ -108,18 +108,12 @@ MessageObject :: distinct struct {
 	type:                MessageObjectType,
 	get_message_content: proc() -> string,
 }
-MessageContent :: union {
-	Word,
-	Number,
-	Equals,
-	MessageObject,
-}
 TabletPosition :: struct {
 	tablet, line: int,
 	col:          f64,
 }
 MessageElement :: struct {
-	content:        MessageContent,
+	content:        Word,
 	using position: TabletPosition,
 	h:              Maybe(GameObjectHandle),
 }
@@ -399,7 +393,7 @@ game_update :: proc(game: ^Game, dt: f64) {
 				for obj in all_objects_with_tags(&it, .InMessage, .Draggable) {
 					m, has_message := obj.message_element.?
 					if !has_message {continue}
-					obj.position = linalg.lerp(obj.position, tablet_to_world(m.position), 0.8)
+					obj.position = linalg.lerp(obj.position, tablet_to_world(m.position), 0.6)
 				}
 			}
 			timer->time("update message element pos")
@@ -541,86 +535,22 @@ game_specific_load :: proc(game: ^Game = game, save: ^GameSave) {
 //decode message
 message_to_string :: proc(message: Message) -> string {
 	replacements := map[MessageElement]MessageElement{}
-	result := ""
-	//parse message into result
-	i := 0
-	for i < len(message) {
-		element := message[i]
-		//assume we are at the start of a token
-		//a token is either
-		//  a single element
-		//  [key: MessageElement] equals [value]
-		//  [number] times [value]
-		switch content in element.content {
-		case Number:
-			repetitions := content.number
-			sb := strings.builder_make(); defer strings.builder_destroy(&sb)
-			for i < len(message) {
-				i += 1
-				next_element := message[i]
-				switch next_content in next_element.content {
-				case Number:
-					repetitions *= 10
-					repetitions += next_content.number
-				case Word:
-					for _ in 0 ..< repetitions {
-						fmt.sbprint(&sb, next_content.str)
-					}
-				case Equals:
-				//invalid
-				case MessageObject:
-				//
-				}
-			}
-		case Equals:
-		//should be unreachable if message is valid - if invalid, do nothing
-		case MessageObject:
-			if i < len(message) - 2 {
-				next_element := message[i + 1]
-				#partial switch next_content in next_element.content {
-				case Equals:
-				// handle_equals(message, i)
-				case:
-					break
-				}
-			}
-		case Word:
-			if i < len(message) - 2 {
-				next_element := message[i + 1]
-				#partial switch next_content in next_element.content {
-				case Equals:
-				// handle_equals(message, i)
-				case:
-					break
-				}
-			}
+	builder := strings.builder_make(); defer strings.builder_destroy(&builder)
+	for i in 0 ..< len(message) {
+		if i > 0 {
+			fmt.sbprint(&builder, " ")
 		}
+		fmt.sbprint(&builder, message[i].content.str)
 	}
-	return result
+	return strings.to_string(builder)
 }
 
-get_message_element_text :: proc(element: MessageContent) -> string {
-	text: string
-	switch content in element {
-	case Word:
-		text = content.str
-	case Number:
-		text = fmt.aprint(content.number)
-	case Equals:
-		text = "="
-	case MessageObject:
-		text = "."
-	}
-	return text
-}
-
-get_message_element_size :: proc(element: MessageContent) -> vec2 {
-	text := get_message_element_text(element)
+get_message_element_size :: proc(element: Word) -> vec2 {
 	letter_size: f64 = 1 //TODO this probably won't end up being implemented
 	font_size := f32(letter_size * IN_GAME_FONT_SIZE)
 	world_size_pix := rl.MeasureTextEx(
 		global_default_font,
-		strings.clone_to_cstring(text),
+		strings.clone_to_cstring(element.str),
 		font_size,
 		0,
 	)
@@ -794,7 +724,7 @@ spawn_tablets :: proc(level: Level, message: ^Message) {
 
 spawn_message_element_object :: proc(element: MessageElement) -> GameObjectHandle {
 	tablet: GameObjectInst(Tablet) = get_object(game.tablet_objects[element.tablet], Tablet)
-	text := get_message_element_text(element.content)
+	text := element.content.str
 	letter_size: f64 = 1 //TODO this probably won't end up being implemented
 	font_size := f32(letter_size * IN_GAME_FONT_SIZE)
 	size := get_message_element_size(element.content)
@@ -857,7 +787,6 @@ tablet_to_world :: proc(elem: TabletPosition) -> vec2 {
 	tablet: GameObjectInst(Tablet) = get_object(game.tablet_objects[elem.tablet], Tablet)
 	return local_to_world(tablet.handle, tablet_to_local(elem) + tablet.pivot)
 }
-
 local_to_tablet :: proc(tablet: GameObjectInst(Tablet), local_pos: vec2) -> TabletPosition {
 	tablet_rect := aabb_to_rect(tablet.hitbox.shape.(AABB))
 	line_width := tablet_rect.width * 0.8
@@ -869,7 +798,6 @@ local_to_tablet :: proc(tablet: GameObjectInst(Tablet), local_pos: vec2) -> Tabl
 	line := clamp(int(math.round((diff.y / line_height))), 0, LINES_PER_TABLET)
 	return TabletPosition{tablet = tablet.index_within_message, line = line, col = col}
 }
-
 world_to_tablet :: proc(tablet: GameObjectInst(Tablet), world_pos: vec2) -> TabletPosition {
 	return local_to_tablet(tablet, world_to_local(tablet.handle, world_pos))
 }
@@ -930,13 +858,11 @@ handle_ui_buttons :: proc() {
 			game.final_transforms[button_handle.idx].transform,
 		)
 		hovering := is_point_in_aabb(mouse_screen_pos, screen_aabb)
-		//TODO skip this stuff if there is another active UI interaction such as being in the middle of a slider drag
 		scale_target := button.min_scale
 		if hovering {
 			scale_target = button.max_scale
 		}
 		button.scale *= 1 + (scale_target - button.scale) * 0.1
-		// clicking := hovering && rl.IsMouseButtonDown(.LEFT)
 		if hovering {
 			button.color = SLATE_GRAY
 			button.text_color = rl.DARKGRAY
